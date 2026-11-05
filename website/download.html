@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Download ORBIT</title>
+  <link rel="icon" href="assets/mark.svg">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="index.html">ORBIT</a>
+    <nav><a href="about.html">About</a><a href="../mobile/www/index.html">Open app</a></nav>
+  </header>
+  <main class="page">
+    <p class="kicker">Android</p>
+    <h1>Download</h1>
+    <p id="release">Checking for a published build…</p>
+    <p>You can also open the app in a browser on this server while you develop.</p>
+    <p><a class="btn" href="../mobile/www/index.html">Open the browser app</a></p>
+  </main>
+  <script>
+    const slot = document.getElementById('release');
+    fetch('/api/v1/releases/latest').then((response) => response.json()).then((body) => {
+      const release = body.data;
+      slot.replaceChildren();
+      if (!release || !release.available) {
+        slot.textContent = 'No Android build is published yet. A download link appears here after a platform administrator publishes an APK.';
+        return;
+      }
+      const text = document.createElement('p');
+      text.textContent = 'Version ' + release.version + '. ' + release.changelog;
+      const link = document.createElement('a');
+      link.className = 'btn solid';
+      link.href = '/api/v1/releases/' + release.id + '/download';
+      link.textContent = 'Download APK';
+      slot.append(text, link);
+    }).catch(() => {
+      slot.textContent = 'The release list could not be loaded.';
+    });
+  </script>
+</body>
+</html>

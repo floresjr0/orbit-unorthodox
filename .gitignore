@@ -1,0 +1,13 @@
+backend/config/config.php
+backend/storage/logs/*
+backend/storage/cache/*
+backend/storage/uploads/*
+backend/storage/releases/*
+!backend/storage/**/.gitkeep
+!backend/storage/**/.htaccess
+mobile/node_modules/
+mobile/android/
+mobile/.gradle/
+.DS_Store
+Thumbs.db
+*.log

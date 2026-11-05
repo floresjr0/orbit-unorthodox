@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBIT platform</title>
+  <link rel="stylesheet" href="../website/css/site.css">
+  <style>
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 20px; }
+    .tabs button { font: inherit; border-radius: 999px; border: 1px solid var(--line); background: white; padding: 8px 12px; cursor: pointer; }
+    .tabs button.on { background: var(--ink); color: var(--bg); }
+    #panel { display: grid; gap: 12px; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="../website/index.html">ORBIT</a>
+    <nav><button id="signout" class="btn" type="button" hidden>Sign out</button></nav>
+  </header>
+  <main class="page">
+    <p class="kicker">Platform</p>
+    <h1>Administration</h1>
+    <p class="lede">This desk manages accounts, reports, and releases. It does not open private team tasks.</p>
+    <form id="login" class="card">
+      <input id="email" type="email" required placeholder="Admin email" autocomplete="username">
+      <input id="password" type="password" required placeholder="Password" autocomplete="current-password">
+      <button class="btn" type="submit">Sign in</button>
+      <p id="login-status" role="status"></p>
+    </form>
+    <section id="desk" hidden>
+      <div class="tabs" id="tabs"></div>
+      <div id="panel"></div>
+    </section>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

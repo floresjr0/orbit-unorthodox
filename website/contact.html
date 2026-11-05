@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact ORBIT</title>
+  <link rel="icon" href="assets/mark.svg">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <header class="nav"><a class="brand" href="index.html">ORBIT</a><nav><a href="about.html">About</a></nav></header>
+  <main class="page">
+    <p class="kicker">Contact</p>
+    <h1>Write to the platform</h1>
+    <form id="contact">
+      <input name="name" required minlength="2" placeholder="Name" autocomplete="name">
+      <input name="email" type="email" required placeholder="Email" autocomplete="email">
+      <textarea name="message" required minlength="8" rows="5" placeholder="How can we help?"></textarea>
+      <button class="btn" type="submit">Send</button>
+      <p id="status" role="status"></p>
+    </form>
+  </main>
+  <script>
+    const form = document.getElementById('contact');
+    const status = document.getElementById('status');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      status.textContent = 'Sending…';
+      const body = Object.fromEntries(new FormData(form));
+      try {
+        const response = await fetch('/api/v1/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const payload = await response.json();
+        status.textContent = payload.message || 'Message received.';
+        if (payload.success) form.reset();
+      } catch {
+        status.textContent = 'The message could not be sent.';
+      }
+    });
+  </script>
+</body>
+</html>

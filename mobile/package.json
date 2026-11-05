@@ -1,0 +1,19 @@
+{
+  "name": "orbit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ORBIT team collaboration app for Android via Capacitor.",
+  "scripts": {
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
+    "cap:add": "cap add android"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "^7.0.1",
+    "@capacitor/android": "^7.2.0",
+    "@capacitor/core": "^7.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.2.0"
+  }
+}

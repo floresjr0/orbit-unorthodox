@@ -1,0 +1,13 @@
+{
+  "appId": "app.orbit.team",
+  "appName": "ORBIT",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    }
+  }
+}

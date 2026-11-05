@@ -1,0 +1,6 @@
+RewriteEngine On
+RewriteRule ^backend(/|$) - [F,L]
+RewriteRule ^database(/|$) - [F,L]
+RewriteRule ^documentation(/|$) - [F,L]
+
+DirectoryIndex index.php index.html
