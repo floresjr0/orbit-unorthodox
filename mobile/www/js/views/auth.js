@@ -1,50 +1,15 @@
 import { api, ApiError, OfflineError } from '../api.js';
+import { db } from '../db.js';
 import { apiBase, setApiBase } from '../config.js';
 import { navigate } from '../router.js';
 import { saveSession } from '../session.js';
 import { applyTheme } from '../state.js';
 import { el, field, setBusy, textInput, toast } from '../ui.js';
 
-async function startGoogle() {
-  try {
-    const providers = await api('/auth/providers', { auth: false });
-    if (!providers.data.google_enabled) {
-      toast('Google Sign-In is not configured on this server.');
-      return;
-    }
-    await loadGoogle();
-    window.google.accounts.id.initialize({
-      client_id: providers.data.google_client_id,
-      callback: async (response) => {
-        try {
-          const result = await api('/auth/google', { method: 'POST', auth: false, body: { id_token: response.credential } });
-          await afterAuth(result.data);
-        } catch (error) {
-          toast(error.message);
-        }
-      },
-    });
-    window.google.accounts.id.prompt();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-function loadGoogle() {
-  if (window.google?.accounts?.id) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Google Sign-In could not be loaded.'));
-    document.head.append(script);
-  });
-}
-
-async function afterAuth(data) {
+async function afterAuth(data, next = 'dashboard') {
   await saveSession(data);
   applyTheme(data.user.theme);
-  navigate('dashboard', {}, true);
+  navigate(next, {}, true);
 }
 
 function authShell(title, copy, form) {
@@ -75,7 +40,6 @@ export function renderLogin(root) {
     field('Password', password),
     el('details', { class: 'advanced' }, [el('summary', {}, 'Server address'), field('API base URL', server)]),
     button,
-    el('button', { class: 'btn ghost full', type: 'button', onclick: () => startGoogle() }, 'Continue with Google'),
     el('p', { class: 'auth-links' }, [
       el('button', { class: 'link', type: 'button', onclick: () => navigate('forgot') }, 'Forgot password'),
       el('button', { class: 'link', type: 'button', onclick: () => navigate('register') }, 'Create an account'),
@@ -89,9 +53,21 @@ export function renderRegister(root) {
   const email = textInput({ type: 'email', required: 'true', autocomplete: 'username', placeholder: 'Email' });
   const password = textInput({ type: 'password', required: 'true', autocomplete: 'new-password', placeholder: 'At least 8 characters' });
   const confirm = textInput({ type: 'password', required: 'true', placeholder: 'Confirm password' });
+  let designation = '';
+  const leader = el('button', { class: 'chip', type: 'button', onclick: () => pick('leader') }, 'Leader');
+  const member = el('button', { class: 'chip', type: 'button', onclick: () => pick('member') }, 'Member');
+  function pick(value) {
+    designation = value;
+    leader.classList.toggle('on', value === 'leader');
+    member.classList.toggle('on', value === 'member');
+  }
   const button = el('button', { class: 'btn primary full', type: 'submit' }, 'Create account');
   const form = el('form', { class: 'stack', onsubmit: async (event) => {
     event.preventDefault();
+    if (!designation) {
+      toast('Choose Leader or Member.');
+      return;
+    }
     setBusy(button, true);
     try {
       const result = await api('/auth/register', {
@@ -99,7 +75,8 @@ export function renderRegister(root) {
         auth: false,
         body: { full_name: name.value, email: email.value, password: password.value, password_confirmation: confirm.value },
       });
-      await afterAuth(result.data);
+      await db.setMeta(`designation.${result.data.user.id}`, designation);
+      await afterAuth(result.data, designation === 'leader' ? 'team-new' : 'join');
     } catch (error) {
       toast(error instanceof ApiError ? error.message : 'Could not create the account.');
       setBusy(button, false, 'Create account');
@@ -109,10 +86,11 @@ export function renderRegister(root) {
     field('Email', email),
     field('Password', password),
     field('Confirm password', confirm),
+    el('div', { class: 'field' }, [el('span', {}, 'Designation'), el('div', { class: 'choice' }, [leader, member])]),
     button,
     el('button', { class: 'link', type: 'button', onclick: () => navigate('login') }, 'I already have an account'),
   ]);
-  root.append(authShell('Create your account', 'One account can belong to as many teams as you need.', form));
+  root.append(authShell('Create your account', 'Leaders start a group. Members join with a code.', form));
 }
 
 export function renderForgot(root) {

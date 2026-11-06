@@ -127,6 +127,9 @@ final class TaskService
                     if (mb_strlen($value) > $max) {
                         throw new HttpException(422, 'That text is too long.');
                     }
+                    if ($key === 'instructions' && $value !== '') {
+                        $value = $this->driveLink($value, 2000);
+                    }
                     $value = $value === '' ? null : $value;
                     if ($value !== $task[$key]) {
                         $fields[$key] = $value;
@@ -629,7 +632,14 @@ final class TaskService
     private function complete(array $actor, array $task, bool $isLeader, ?string $note): array
     {
         $taskId = (int) $task['id'];
-        if ($task['status'] === 'done' && $task['review_status'] !== 'awaiting') {
+        $link = $this->driveLink($note);
+        $finished = $task['status'] === 'done' && $task['review_status'] !== 'awaiting';
+        if (!$isLeader && $link === null && empty($task['work_link']) && !$finished) {
+            throw new HttpException(422, 'Paste a Google Drive link to mark this done.');
+        }
+        if ($finished) {
+            $this->saveWorkLink($taskId, $link);
+
             return $this->present($taskId);
         }
         if ($isLeader) {
@@ -641,6 +651,7 @@ final class TaskService
                 'UPDATE tasks SET status = "done", review_status = ?, submitted_at = COALESCE(submitted_at, UTC_TIMESTAMP()),
                  completed_at = UTC_TIMESTAMP(), version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ?'
             )->execute([$review, $taskId]);
+            $this->saveWorkLink($taskId, $link);
             $fresh = $this->row($taskId);
             $this->log($fresh, $actor, 'status_changed', 'Status changed to done.');
             $this->notifyStatus($actor, $fresh, true);
@@ -659,6 +670,7 @@ final class TaskService
             $this->app->pdo()->prepare(
                 'UPDATE tasks SET status = ?, review_status = "awaiting", submitted_at = UTC_TIMESTAMP(), version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ?'
             )->execute([$working, $taskId]);
+            $this->saveWorkLink($taskId, $link);
             $fresh = $this->row($taskId);
             $this->log($fresh, $actor, 'completion_submitted', 'Completion was submitted for review.');
             $leader = $this->leaderId((int) $task['team_id']);
@@ -677,6 +689,7 @@ final class TaskService
         $this->app->pdo()->prepare(
             'UPDATE tasks SET status = "done", review_status = "none", completed_at = UTC_TIMESTAMP(), version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ?'
         )->execute([$taskId]);
+        $this->saveWorkLink($taskId, $link);
         $fresh = $this->row($taskId);
         $this->log($fresh, $actor, 'status_changed', 'Status changed to done.');
         $this->notifyStatus($actor, $fresh, false);
@@ -770,6 +783,9 @@ final class TaskService
         $instructions = trim((string) ($input['instructions'] ?? ''));
         if (mb_strlen($description) > 8000 || mb_strlen($instructions) > 8000) {
             throw new HttpException(422, 'That text is too long.');
+        }
+        if ($instructions !== '') {
+            $instructions = $this->driveLink($instructions, 2000);
         }
         $priority = (string) ($input['priority'] ?? 'medium');
         if (!in_array($priority, self::PRIORITIES, true)) {
@@ -1225,6 +1241,31 @@ final class TaskService
         }
 
         return $row;
+    }
+
+    private function driveLink(?string $note, int $max = 500): ?string
+    {
+        $note = trim((string) $note);
+        if ($note === '') {
+            return null;
+        }
+        if (strlen($note) > $max || !filter_var($note, FILTER_VALIDATE_URL)) {
+            throw new HttpException(422, 'Paste a Google Drive link.');
+        }
+        $host = strtolower((string) parse_url($note, PHP_URL_HOST));
+        if (!in_array($host, ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'], true)) {
+            throw new HttpException(422, 'Paste a Google Drive link.');
+        }
+
+        return $note;
+    }
+
+    private function saveWorkLink(int $taskId, ?string $link): void
+    {
+        if ($link === null) {
+            return;
+        }
+        $this->app->pdo()->prepare('UPDATE tasks SET work_link = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$link, $taskId]);
     }
 
     private function shortNote(mixed $note): ?string

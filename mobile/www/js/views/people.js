@@ -1,11 +1,28 @@
 import { api, OfflineError } from '../api.js';
 import { db } from '../db.js';
-import { loadTeams } from '../data.js';
+import { accountIsLeader, loadTeams } from '../data.js';
 import { navigate } from '../router.js';
 import { clearSession } from '../session.js';
 import { applyTheme, state } from '../state.js';
 import { syncNow } from '../sync.js';
-import { badge, confirmDialog, el, emptyState, errorState, field, formatWhen, setBusy, skeleton, textInput, toast } from '../ui.js';
+import { badge, bubble, confirmDialog, el, emptyState, field, formatWhen, presentError, searchList, setBusy, skeleton, talkForm, textInput, toast } from '../ui.js';
+
+function isDriveLink(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function settingSwitch(title, detail, on, onChange) {
+  const input = el('input', { type: 'checkbox', checked: on ? 'checked' : null, onchange: () => onChange(input.checked) });
+  return el('label', { class: 'setting' }, [
+    el('span', { class: 'setting-copy' }, [el('strong', {}, title), el('span', {}, detail)]),
+    el('span', { class: 'switch' }, [input, el('i')]),
+  ]);
+}
 
 function screen(title, body, actions = []) {
   return el('section', { class: 'screen stack' }, [
@@ -17,135 +34,262 @@ function screen(title, body, actions = []) {
 export async function renderTeams(root) {
   root.append(skeleton());
   try {
-    const teams = await loadTeams();
-    root.replaceChildren(screen('Teams', teams.length ? el('div', { class: 'stack' }, teams.map((team) =>
-      el('button', { class: 'card linkish', type: 'button', onclick: () => navigate('team', { id: team.id }) }, [
-        el('strong', {}, team.name),
-        el('span', { class: 'muted' }, `${team.role} · ${team.member_count ?? 0} members${team.membership_status === 'pending' ? ' · waiting for approval' : ''}`),
-      ])
-    )) : emptyState('No teams yet', 'Create a team or join one with an invitation code.'), [
-      el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('join') }, 'Join'),
-      el('button', { class: 'btn primary', type: 'button', onclick: () => navigate('team-new') }, 'Create'),
-    ]));
+    const all = await loadTeams();
+    const teams = all.filter((team) => team.status !== 'archived');
+    const leader = await accountIsLeader(all);
+    const action = leader
+      ? el('button', { class: 'btn primary', type: 'button', onclick: () => navigate('team-new') }, 'Create')
+      : el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('join') }, 'Join a group');
+    if (!teams.length) {
+      root.replaceChildren(screen('Teams', emptyState('No group yet', leader ? 'Create a group to get a code.' : 'Join a group with its code.'), [action]));
+      return;
+    }
+    const blocks = [];
+    for (const team of teams) {
+      const members = navigator.onLine ? (await api(`/teams/${team.id}/members`)).data : [];
+      blocks.push(groupCard(team, members.filter((person) => person.status === 'active')));
+    }
+    root.replaceChildren(screen('Teams', el('div', { class: 'stack' }, blocks), [action]));
   } catch (error) {
-    root.replaceChildren(errorState(error.message, () => renderTeams(root)));
+    presentError(root, error, () => renderTeams(root));
   }
+}
+
+function groupCard(team, members) {
+  const code = team.invitation?.code || '';
+  return el('section', { class: 'stack' }, [
+    el('h2', { class: 'section-title' }, team.name),
+    team.role === 'leader' && code ? el('div', { class: 'card stack' }, [
+      el('span', { class: 'kicker' }, 'Group code'),
+      el('strong', { class: 'code' }, code),
+    ]) : null,
+    members.length ? searchList(members, (person) => {
+      const body = [el('strong', {}, person.full_name), el('span', { class: 'muted' }, person.role === 'leader' ? 'Leader' : 'Member')];
+      return team.role === 'leader'
+        ? el('button', { class: 'card linkish', type: 'button', onclick: () => navigate('member', { id: team.id, user: person.id }) }, body)
+        : el('div', { class: 'card' }, body);
+    }, { placeholder: 'Search members', prompt: 'Search a name.' }) : el('p', { class: 'muted' }, 'No members yet.'),
+  ]);
 }
 
 export async function renderTeam(root) {
-  const id = Number(state.params.id);
-  root.append(skeleton());
-  try {
-    const team = navigator.onLine ? (await api(`/teams/${id}`)).data : (await db.all('teams')).find((item) => item.id === id);
-    if (!team) {
-      root.replaceChildren(emptyState('Team not on this device', 'Open it once while online.'));
+  navigate('teams', {}, true);
+}
+
+function memberPicker(active, picked) {
+  const chips = el('div', { class: 'picks' });
+  const results = el('div', { class: 'stack' });
+  const search = textInput({
+    type: 'search',
+    placeholder: 'Search a name to add',
+    autocomplete: 'off',
+    oninput: () => paint(),
+    onkeydown: (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const found = matches();
+      if (found.length === 1) add(found[0].id);
+    },
+  });
+
+  function matches() {
+    const query = search.value.trim().toLowerCase();
+    if (!query) return [];
+    return active.filter((item) => !picked.has(item.id) && item.full_name.toLowerCase().includes(query));
+  }
+
+  function add(id) {
+    picked.add(id);
+    search.value = '';
+    paint();
+  }
+
+  function paint() {
+    chips.replaceChildren(...[...picked].flatMap((id) => {
+      const person = active.find((item) => item.id === id);
+      if (!person) return [];
+      return [el('button', {
+        type: 'button',
+        class: 'chip on',
+        onclick: () => {
+          picked.delete(id);
+          paint();
+        },
+      }, `${person.full_name} ×`)];
+    }));
+    const query = search.value.trim();
+    const found = matches();
+    const shown = found.slice(0, 6);
+    if (!query) {
+      results.replaceChildren();
       return;
     }
-    await db.put('teams', team);
-    const members = navigator.onLine ? (await api(`/teams/${id}/members`)).data : [];
-    const announcements = navigator.onLine ? (await api(`/teams/${id}/announcements`)).data : (await db.all('announcements')).filter((item) => item.team_id === id);
-    const leader = team.role === 'leader';
-    const blocks = [
-      el('button', { class: 'link back', type: 'button', onclick: () => history.back() }, 'Back'),
-      el('h1', {}, team.name),
-      team.description ? el('p', {}, team.description) : null,
-      leader && team.invitation ? el('div', { class: 'card stack' }, [
-        el('span', { class: 'kicker' }, 'Invitation'),
-        el('strong', { class: 'code' }, team.invitation.code),
-        el('span', { class: 'muted' }, team.invitation.is_active ? `${team.invitation.use_count} uses` : 'Invitations are off'),
-        el('div', { class: 'row' }, [
-          el('button', { class: 'btn ghost', type: 'button', onclick: async () => { await navigator.clipboard?.writeText(team.invitation.code); toast('Code copied.'); } }, 'Copy'),
-          el('button', { class: 'btn ghost', type: 'button', onclick: async () => { await api(`/teams/${id}/invitation/regenerate`, { method: 'POST' }); renderTeam(root); } }, 'New code'),
-        ]),
-      ]) : null,
-      el('h2', { class: 'section-title' }, 'Members'),
-      ...members.map((person) => el('div', { class: 'person' }, [
-        el('div', {}, [
-          el('strong', {}, person.full_name),
-          el('span', { class: 'muted' }, `${person.role} · ${person.completed_count}/${person.assigned_count} tasks${person.current_activity ? ` · ${person.current_activity}` : ''}`),
-        ]),
-        person.status === 'pending' && leader ? el('button', { class: 'btn primary', type: 'button', onclick: async () => { await api(`/teams/${id}/members/${person.id}/approve`, { method: 'POST' }); renderTeam(root); } }, 'Approve') : null,
-        leader && person.role !== 'leader' ? el('button', { class: 'btn ghost', type: 'button', onclick: async () => {
-          if (!await confirmDialog({ title: `Remove ${person.full_name}?`, message: 'They will lose access to this team.', confirmLabel: 'Remove', danger: true })) return;
-          await api(`/teams/${id}/members/${person.id}`, { method: 'DELETE' });
-          renderTeam(root);
-        } }, 'Remove') : null,
-      ])),
-      el('h2', { class: 'section-title' }, 'Announcements'),
-      ...announcements.map((item) => el('article', { class: 'card' }, [item.is_important ? badge('urgent', 'Important') : null, el('h3', {}, item.title), el('p', {}, item.body)])),
-    ];
-    if (leader) {
-      const title = textInput({ placeholder: 'Announcement title' });
-      const message = el('textarea', { rows: '3', placeholder: 'Message' });
-      blocks.push(el('form', { class: 'stack', onsubmit: async (event) => {
-        event.preventDefault();
-        await api(`/teams/${id}/announcements`, { method: 'POST', body: { title: title.value, body: message.value, is_important: true } });
-        renderTeam(root);
-      } }, [title, message, el('button', { class: 'btn primary', type: 'submit' }, 'Publish')]));
-      blocks.push(el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('report') }, 'Open report'));
-    } else {
-      blocks.push(el('button', { class: 'btn danger', type: 'button', onclick: async () => {
-        if (!await confirmDialog({ title: 'Leave this team?', message: 'You will keep your account, and lose access to this team.', confirmLabel: 'Leave', danger: true })) return;
-        await api(`/teams/${id}/leave`, { method: 'POST' });
-        navigate('teams');
-      } }, 'Leave team'));
+    if (!shown.length) {
+      results.replaceChildren(el('p', { class: 'muted' }, 'No one matches.'));
+      return;
     }
-    root.replaceChildren(el('section', { class: 'screen stack' }, blocks));
+    const hits = shown.map((item) => el('button', { type: 'button', class: 'card linkish', onclick: () => add(item.id) }, item.full_name));
+    if (found.length > shown.length) hits.push(el('p', { class: 'muted' }, 'Keep typing to narrow the list.'));
+    results.replaceChildren(...hits);
+  }
+
+  paint();
+  return el('div', { class: 'stack' }, [chips, search, results]);
+}
+
+export async function renderMember(root) {
+  const teamId = Number(state.params.id);
+  const userId = Number(state.params.user);
+  root.append(skeleton(2));
+  try {
+    const members = navigator.onLine ? (await api(`/teams/${teamId}/members`)).data : [];
+    const person = members.find((item) => item.id === userId);
+    if (!person) {
+      root.replaceChildren(emptyState('Member unavailable', 'Open the group again while you are online.'));
+      return;
+    }
+    const tasks = navigator.onLine ? (await api(`/tasks?scope=team&team_id=${teamId}&assignee_id=${userId}`)).data.items : [];
+    const active = members.filter((item) => item.status === 'active');
+    const picked = new Set([userId]);
+    const title = textInput({ required: 'true', placeholder: 'What should they do?' });
+    const guide = textInput({ type: 'url', placeholder: 'https://drive.google.com/...' });
+    const due = el('input', { type: 'datetime-local' });
+    const button = el('button', { class: 'btn primary', type: 'submit' }, 'Assign');
+    const people = memberPicker(active, picked);
+    root.replaceChildren(el('section', { class: 'screen stack' }, [
+      el('h1', {}, person.full_name),
+      el('p', { class: 'muted' }, person.role === 'leader' ? 'Leader' : 'Member'),
+      el('h2', { class: 'section-title' }, 'Assign a task'),
+      el('form', { class: 'stack', onsubmit: async (event) => {
+        event.preventDefault();
+        const guideLink = guide.value.trim();
+        const assigneeIds = [...picked];
+        if (!assigneeIds.length) {
+          toast('Choose at least one member.');
+          return;
+        }
+        if (guideLink && !isDriveLink(guideLink)) {
+          toast('Paste a Google Drive link.');
+          return;
+        }
+        setBusy(button, true);
+        try {
+          await api(`/teams/${teamId}/tasks`, { method: 'POST', body: {
+            team_id: teamId,
+            title: title.value,
+            instructions: guideLink || null,
+            assignee_ids: assigneeIds,
+            deadline: due.value ? new Date(due.value).toISOString() : null,
+          } });
+          toast('Task assigned.');
+          await renderMember(root);
+        } catch (error) {
+          toast(error.message);
+          if (button.isConnected) setBusy(button, false, 'Assign');
+        }
+      } }, [
+        field('Task', title),
+        field('Instructions', guide),
+        field('Due', due),
+        el('div', { class: 'field' }, [el('span', {}, 'People'), people]),
+        button,
+      ]),
+      el('h2', { class: 'section-title' }, 'Status'),
+      tasks.length ? el('div', { class: 'stack' }, tasks.map((task) => el('button', { class: 'card linkish', type: 'button', onclick: () => navigate('task', { id: task.id }) }, [
+        el('strong', {}, task.title),
+        el('span', { class: 'muted' }, task.status === 'done' ? 'Done' : (task.status === 'pending' || task.review_status === 'awaiting' ? 'Pending' : 'Not done')),
+      ]))) : el('p', { class: 'muted' }, 'Nothing assigned yet.'),
+    ]));
   } catch (error) {
-    root.replaceChildren(errorState(error.message, () => renderTeam(root)));
+    presentError(root, error, () => renderMember(root));
   }
 }
 
-export function renderTeamForm(root) {
-  const name = textInput({ required: 'true', placeholder: 'Team name' });
-  const description = el('textarea', { rows: '3', placeholder: 'What is this team for?' });
-  const category = textInput({ placeholder: 'Academic, product, studio…' });
-  const approval = el('input', { type: 'checkbox' });
-  const verify = el('input', { type: 'checkbox' });
-  const button = el('button', { class: 'btn primary', type: 'submit' }, 'Create team');
-  root.append(screen('New team', el('form', { class: 'stack', onsubmit: async (event) => {
+export async function renderTeamForm(root) {
+  const teams = await loadTeams().catch(() => []);
+  if (!await accountIsLeader(teams)) {
+    navigate('teams', {}, true);
+    return;
+  }
+  const name = textInput({ required: 'true', placeholder: 'Group name' });
+  const button = el('button', { class: 'btn primary', type: 'submit' }, 'Create group');
+  root.append(screen('New group', el('form', { class: 'stack', onsubmit: async (event) => {
     event.preventDefault();
     setBusy(button, true);
     try {
-      const team = (await api('/teams', { method: 'POST', body: {
-        name: name.value,
-        description: description.value,
-        category: category.value,
-        require_join_approval: approval.checked,
-        require_task_verification: verify.checked,
-      } })).data;
+      const team = (await api('/teams', { method: 'POST', body: { name: name.value } })).data;
       await db.put('teams', team);
-      navigate('team', { id: team.id }, true);
+      toast('Group code is ready. It cannot be changed.');
+      navigate('teams', {}, true);
     } catch (error) {
       toast(error.message);
-      setBusy(button, false, 'Create team');
+      setBusy(button, false, 'Create group');
     }
   } }, [
     field('Name', name),
-    field('Description', description),
-    field('Category', category),
-    el('label', { class: 'check' }, [approval, 'Approve new members']),
-    el('label', { class: 'check' }, [verify, 'Review completed tasks']),
+    el('p', { class: 'muted' }, 'A group code is created with the group. It stays the same.'),
     button,
   ])));
 }
 
-export function renderJoin(root) {
+export async function renderJoin(root) {
+  const teams = await loadTeams().catch(() => []);
+  if (await accountIsLeader(teams)) {
+    navigate('teams', {}, true);
+    return;
+  }
   const code = textInput({ required: 'true', placeholder: 'ABCD-EFGH-IJKL', autocapitalize: 'characters' });
-  const button = el('button', { class: 'btn primary', type: 'submit' }, 'Join team');
-  root.append(screen('Join a team', el('form', { class: 'stack', onsubmit: async (event) => {
+  const button = el('button', { class: 'btn primary', type: 'submit' }, 'Join group');
+  root.append(screen('Join a group', el('form', { class: 'stack', onsubmit: async (event) => {
     event.preventDefault();
     setBusy(button, true);
     try {
       const team = (await api('/invitations/join', { method: 'POST', body: { code: code.value } })).data;
       await db.put('teams', team);
       toast(team.membership_status === 'pending' ? 'Request sent to the leader.' : 'You joined the team.');
-      navigate('team', { id: team.id }, true);
+      navigate('teams', {}, true);
     } catch (error) {
       toast(error.message);
-      setBusy(button, false, 'Join team');
+      setBusy(button, false, 'Join group');
     }
-  } }, [field('Invitation code', code), button])));
+  } }, [field('Group code', code), button])));
+}
+
+export async function renderChat(root) {
+  root.append(skeleton());
+  try {
+    const teams = (await loadTeams()).filter((team) => team.status !== 'archived' && team.membership_status !== 'pending');
+    if (!teams.length) {
+      root.replaceChildren(screen('Chat', emptyState('No group yet', 'Join a group before you can talk with everyone.')));
+      return;
+    }
+    let teamId = Number(sessionStorage.getItem('orbit.group') || teams[0].id);
+    if (!teams.some((team) => team.id === teamId)) teamId = teams[0].id;
+    const team = teams.find((item) => item.id === teamId);
+    const members = navigator.onLine ? ((await api(`/teams/${teamId}/members`)).data || []).filter((person) => person.status === 'active') : [];
+    const messages = navigator.onLine ? (await api(`/teams/${teamId}/messages`)).data || [] : [];
+    const names = members.map((person) => person.full_name);
+    const thread = el('div', { class: 'talk' }, messages.length
+      ? messages.map((item) => bubble(item, names))
+      : [el('p', { class: 'muted' }, 'No messages yet. Type @ to mention someone.')]);
+    root.replaceChildren(screen('Chat', el('div', { class: 'stack' }, [
+      teams.length > 1 ? el('select', {
+        onchange: (event) => {
+          sessionStorage.setItem('orbit.group', event.target.value);
+          renderChat(root);
+        },
+      }, teams.map((item) => el('option', { value: String(item.id), selected: item.id === teamId ? 'selected' : null }, item.name))) : el('p', { class: 'muted' }, team.name),
+      thread,
+      talkForm(members, 'Message the group', async (body) => {
+        const message = (await api(`/teams/${teamId}/messages`, { method: 'POST', body: { body } })).data;
+        thread.querySelector('.muted')?.remove();
+        thread.append(bubble(message, names));
+        toast('Message sent.');
+      }),
+    ])));
+  } catch (error) {
+    presentError(root, error, () => renderChat(root));
+  }
 }
 
 export async function renderAlerts(root) {
@@ -163,25 +307,36 @@ export async function renderAlerts(root) {
     } else {
       data.items = await db.all('notifications');
     }
-    root.replaceChildren(screen('Notifications', data.items.length ? el('div', { class: 'stack' }, data.items.map((item) =>
+    const items = data.items.filter((item) => {
+      if (item.type === 'deadline_reminder' || item.type === 'overdue') return true;
+      if (item.type === 'review_approved' || item.type === 'review_requested') return true;
+      if (item.type === 'comment' || item.type === 'mention') return true;
+      return item.type === 'status_changed' && (item.data?.status === 'done' || item.title?.toLowerCase().includes('done'));
+    });
+    root.replaceChildren(screen('Alerts', items.length ? el('div', { class: 'stack' }, items.map((item) =>
       el('button', { class: `card notice ${item.is_read ? '' : 'unread'}`, type: 'button', onclick: async () => {
         if (navigator.onLine) await api(`/notifications/${item.id}/read`, { method: 'POST' });
         if (item.data?.task_id) navigate('task', { id: item.data.task_id });
+        else if (item.type === 'mention') navigate('chat');
       } }, [
         el('strong', {}, item.title),
         el('span', {}, item.body),
         el('time', { class: 'muted' }, formatWhen(item.created_at)),
       ])
-    )) : emptyState('You are caught up', 'Assignments, comments, and reminders will land here.'), [
-      el('button', { class: 'btn ghost', type: 'button', onclick: async () => { await api('/notifications/read', { method: 'POST' }); renderAlerts(root); } }, 'Mark all read'),
+    )) : emptyState('No alerts', 'You will see finished work, a close due date, a task comment, and when someone mentions you.'), [
+      items.length ? el('button', { class: 'btn ghost', type: 'button', onclick: async () => { await api('/notifications/read', { method: 'POST' }); renderAlerts(root); } }, 'Mark all read') : null,
     ]));
   } catch (error) {
-    root.replaceChildren(errorState(error.message, () => renderAlerts(root)));
+    presentError(root, error, () => renderAlerts(root));
   }
 }
 
 export async function renderProfile(root) {
   const user = state.user;
+  if (!user) {
+    navigate('login', {}, true);
+    return;
+  }
   let prefs = {};
   try {
     prefs = (await api('/users/me/preferences')).data;
@@ -189,32 +344,42 @@ export async function renderProfile(root) {
     prefs = {};
   }
   const name = textInput({ value: user.full_name });
-  const theme = el('select', {}, ['system', 'light', 'dark'].map((value) => el('option', { value, selected: (user.theme || 'system') === value ? 'selected' : null }, value)));
+  const theme = el('select', {}, [
+    ['light', 'Light'],
+    ['dark', 'Dark'],
+  ].map(([value, label]) => el('option', { value, selected: (user.theme === 'dark' ? 'dark' : 'light') === value ? 'selected' : null }, label)));
   theme.addEventListener('change', async () => {
     applyTheme(theme.value);
     const updated = (await api('/users/me', { method: 'PATCH', body: { theme: theme.value, full_name: name.value } })).data;
     state.user = updated;
     await db.setMeta('user', JSON.stringify(updated));
   });
-  const prefBox = el('div', { class: 'stack' }, Object.entries(prefs).map(([key, value]) => {
-    const input = el('input', { type: 'checkbox', checked: value ? 'checked' : null, onchange: async () => {
-      prefs[key] = input.checked;
-      await api('/users/me/preferences', { method: 'PUT', body: prefs });
-      toast('Preferences saved.');
-    } });
-    return el('label', { class: 'check' }, [input, key.replaceAll('_', ' ')]);
-  }));
+  const doneKeys = ['status_changed', 'reviews'];
+  const dueKeys = ['deadlines', 'reminder_24h', 'reminder_1h', 'reminder_deadline', 'overdue_reminders'];
+  const saveGroup = async (keys, on) => {
+    for (const key of keys) prefs[key] = on;
+    if (on) prefs.in_app_enabled = true;
+    try {
+      prefs = (await api('/users/me/preferences', { method: 'PUT', body: prefs })).data;
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+  const prefBox = el('div', { class: 'settings' }, [
+    settingSwitch('When someone finishes', 'A member marks work done', doneKeys.some((key) => prefs[key]), (on) => saveGroup(doneKeys, on)),
+    settingSwitch('When a due date is close', 'A day before, an hour before, and if it passes', dueKeys.some((key) => prefs[key]), (on) => saveGroup(dueKeys, on)),
+  ]);
   const current = textInput({ type: 'password', placeholder: 'Current password' });
   const next = textInput({ type: 'password', placeholder: 'New password' });
-  root.append(screen('Profile', el('div', { class: 'stack' }, [
-    el('p', { class: 'muted' }, user.email),
-    field('Name', name),
+  const teams = (await loadTeams().catch(() => [])).filter((team) => team.role === 'leader' && team.status !== 'archived');
+  root.replaceChildren(screen('Profile', el('div', { class: 'stack' }, [
+    field('Full name', name),
     el('button', { class: 'btn ghost', type: 'button', onclick: async () => {
       const updated = (await api('/users/me', { method: 'PATCH', body: { full_name: name.value, theme: theme.value } })).data;
       state.user = updated;
       await db.setMeta('user', JSON.stringify(updated));
-      toast('Profile saved.');
-    } }, 'Save profile'),
+      toast('Name saved.');
+    } }, 'Save name'),
     field('Appearance', theme),
     el('h2', { class: 'section-title' }, 'Notifications'),
     prefBox,
@@ -229,35 +394,21 @@ export async function renderProfile(root) {
         toast(error.message);
       }
     } }, 'Change password'),
-    el('button', { class: 'btn ghost', type: 'button', onclick: async () => { await syncNow().catch((error) => toast(error.message)); toast('Sync finished.'); } }, 'Sync now'),
-    el('h2', { class: 'section-title' }, 'Sessions'),
-    el('div', { id: 'sessions', class: 'stack' }, [el('button', { class: 'btn ghost', type: 'button', onclick: async (event) => {
-      const box = event.currentTarget.parentElement;
-      const sessions = (await api('/auth/sessions')).data;
-      box.replaceChildren(...sessions.map((item) => el('div', { class: 'person' }, [
-        el('div', {}, [el('strong', {}, item.device_name || 'Device'), el('span', { class: 'muted' }, item.current ? 'This device' : formatWhen(item.last_used_at))]),
-        item.current ? null : el('button', { class: 'btn ghost', type: 'button', onclick: async () => {
-          await api(`/auth/sessions/${item.id}`, { method: 'DELETE' });
-          toast('Session revoked.');
-        } }, 'Revoke'),
-      ])));
-    } }, 'Show sessions')]),
-    el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('calendar') }, 'Calendar'),
-    el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('report') }, 'Reports'),
+    el('h2', { class: 'section-title' }, 'Group code'),
+    teams.length ? el('div', { class: 'stack' }, teams.map((team) => el('div', { class: 'card stack' }, [
+      el('strong', {}, team.name),
+      el('span', { class: 'code' }, team.invitation?.code || 'Unavailable offline'),
+      el('p', { class: 'muted' }, 'This code cannot be changed.'),
+      el('button', { class: 'btn danger', type: 'button', onclick: async () => {
+        if (!await confirmDialog({ title: `Close ${team.name}?`, message: 'The project ends and members can no longer use this group.', confirmLabel: 'Close group', danger: true })) return;
+        await api(`/teams/${team.id}/archive`, { method: 'POST', body: {} });
+        toast('Group closed.');
+        renderProfile(root);
+      } }, 'Close group'),
+    ]))) : el('p', { class: 'muted' }, 'A group code appears here after you create a group.'),
     el('button', { class: 'btn danger', type: 'button', onclick: async () => {
       await api('/auth/logout', { method: 'POST' }).catch(() => {});
       await clearSession();
     } }, 'Sign out'),
-    el('button', { class: 'btn danger', type: 'button', onclick: async () => {
-      if (!await confirmDialog({ title: 'Delete this account?', message: 'This removes your profile and signs out every device. Transfer leadership first.', confirmLabel: 'Delete account', danger: true })) return;
-      const current = prompt('Current password');
-      if (!current) return;
-      try {
-        await api('/users/me', { method: 'DELETE', body: { current_password: current } });
-        await clearSession();
-      } catch (error) {
-        toast(error.message);
-      }
-    } }, 'Delete account'),
   ])));
 }

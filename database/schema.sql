@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title VARCHAR(160) NOT NULL,
   description TEXT NULL,
   instructions TEXT NULL,
+  work_link VARCHAR(500) NULL,
   priority ENUM('low', 'medium', 'high', 'urgent') NOT NULL DEFAULT 'medium',
   status ENUM('todo', 'in_progress', 'pending', 'blocked', 'done') NOT NULL DEFAULT 'todo',
   review_status ENUM('none', 'awaiting', 'approved', 'rejected') NOT NULL DEFAULT 'none',
@@ -294,6 +295,19 @@ CREATE TABLE IF NOT EXISTS task_reviews (
   CONSTRAINT fk_task_reviews_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
   CONSTRAINT fk_task_reviews_submitter FOREIGN KEY (submitted_by) REFERENCES users (id) ON DELETE SET NULL,
   CONSTRAINT fk_task_reviews_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS team_messages (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  team_id BIGINT UNSIGNED NOT NULL,
+  user_id BIGINT UNSIGNED NULL,
+  author_name VARCHAR(120) NOT NULL,
+  body VARCHAR(2000) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_team_messages_team (team_id, id),
+  CONSTRAINT fk_team_messages_team FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE,
+  CONSTRAINT fk_team_messages_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS announcements (

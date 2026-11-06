@@ -5,7 +5,7 @@ import { navigate, onRender, readHash, register, show } from './router.js';
 import { pendingCount, syncNow } from './sync.js';
 import { icon, mark } from './ui.js';
 import { renderForgot, renderLogin, renderRegister } from './views/auth.js';
-import { renderAlerts, renderJoin, renderProfile, renderTeam, renderTeamForm, renderTeams } from './views/people.js';
+import { renderAlerts, renderChat, renderJoin, renderMember, renderProfile, renderTeam, renderTeamForm, renderTeams } from './views/people.js';
 import { renderCalendar, renderDashboard, renderReport, renderSearch, renderTask, renderTaskForm, renderTasks } from './views/work.js';
 
 const titles = {
@@ -14,7 +14,9 @@ const titles = {
   task: 'Task',
   'task-new': 'New task',
   teams: 'Teams',
+  chat: 'Chat',
   team: 'Team',
+  member: 'Member',
   'team-new': 'New team',
   join: 'Join',
   alerts: 'Notifications',
@@ -33,7 +35,9 @@ register({
   task: renderTask,
   'task-new': renderTaskForm,
   teams: renderTeams,
+  chat: renderChat,
   team: renderTeam,
+  member: renderMember,
   'team-new': renderTeamForm,
   join: renderJoin,
   alerts: renderAlerts,
@@ -44,7 +48,7 @@ register({
 });
 
 function paintChrome() {
-  const authed = Boolean(state.user);
+  const authed = Boolean(state.user) && !['login', 'register', 'forgot'].includes(state.route);
   const top = document.getElementById('topbar');
   const tabs = document.getElementById('tabbar');
   const banner = document.getElementById('offline-banner');
@@ -81,6 +85,7 @@ function paintChrome() {
     ['dashboard', 'Home', 'home'],
     ['tasks', 'Tasks', 'tasks'],
     ['teams', 'Teams', 'teams'],
+    ['chat', 'Chat', 'chat'],
     ['alerts', 'Alerts', 'bell'],
     ['profile', 'Profile', 'user'],
   ].map(([route, label, glyph]) => {
@@ -88,7 +93,7 @@ function paintChrome() {
     button.type = 'button';
     button.className = `tab ${state.route === route ? 'on' : ''}`;
     button.append(icon(glyph), document.createTextNode(label));
-    button.onclick = () => navigate(route);
+    button.onclick = () => navigate(state.user ? route : 'login');
     return button;
   }));
 }
@@ -111,14 +116,14 @@ onRender(paintChrome);
 window.addEventListener('hashchange', () => {
   const next = readHash();
   state.route = next.name;
-  state.params = { id: next.id };
+  state.params = { id: next.id, user: next.user };
   show();
 });
 
 window.addEventListener('popstate', () => {
   const next = readHash();
   state.route = next.name;
-  state.params = { id: next.id };
+  state.params = { id: next.id, user: next.user };
   show();
 });
 
@@ -156,7 +161,7 @@ if (!state.user && !['login', 'register', 'forgot'].includes(initial.name)) {
   navigate('dashboard', {}, true);
 } else {
   state.route = initial.name;
-  state.params = { id: initial.id };
+  state.params = { id: initial.id, user: initial.user };
   await show();
 }
 if (state.user && navigator.onLine) {

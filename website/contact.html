@@ -3,43 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Contact ORBIT</title>
+  <title>Contact Unorthodox Technologies — ORBIT</title>
+  <meta name="description" content="Contact Unorthodox Technologies on Facebook. Founder Marte Flores Jr. Co-founders Justine Reyes, Melvin Ramos, and Clarenz Geronimo.">
+  <meta name="author" content="Unorthodox Technologies">
+  <meta property="og:title" content="Contact Unorthodox Technologies">
+  <meta property="og:description" content="Marte Flores Jr., Justine Reyes, Melvin Ramos, and Clarenz Geronimo. Unorthodox Technologies builds ORBIT.">
+  <meta property="og:type" content="website">
   <link rel="icon" href="assets/mark.svg">
   <link rel="stylesheet" href="css/site.css">
+  <script src="js/seo.js" defer></script>
 </head>
 <body>
-  <header class="nav"><a class="brand" href="index.html">ORBIT</a><nav><a href="about.html">About</a></nav></header>
+  <header class="nav">
+    <a class="brand" href="index.html">ORBIT</a>
+    <nav><a href="about.html">About</a><a href="download.html">Download</a></nav>
+  </header>
   <main class="page">
     <p class="kicker">Contact</p>
-    <h1>Write to the platform</h1>
-    <form id="contact">
-      <input name="name" required minlength="2" placeholder="Name" autocomplete="name">
-      <input name="email" type="email" required placeholder="Email" autocomplete="email">
-      <textarea name="message" required minlength="8" rows="5" placeholder="How can we help?"></textarea>
-      <button class="btn" type="submit">Send</button>
-      <p id="status" role="status"></p>
-    </form>
+    <h1>Unorthodox Technologies</h1>
+    <p class="lede">Unorthodox Technologies is the independent studio that designs and builds ORBIT. Founder Marte Flores Jr. and co-founders Justine Reyes, Melvin Ramos, and Clarenz Geronimo made the app so teams can keep assignments, deadlines, and progress organized.</p>
+    <div class="people">
+      <article><strong>Marte Flores Jr.</strong><span>Founder</span></article>
+      <article><strong>Justine Reyes</strong><span>Co-founder</span></article>
+      <article><strong>Melvin Ramos</strong><span>Co-founder</span></article>
+      <article><strong>Clarenz Geronimo</strong><span>Co-founder</span></article>
+    </div>
+    <a class="btn" href="https://www.facebook.com/profile.php?id=61591295648007" target="_blank" rel="noopener noreferrer">Facebook</a>
   </main>
-  <script>
-    const form = document.getElementById('contact');
-    const status = document.getElementById('status');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      status.textContent = 'Sending…';
-      const body = Object.fromEntries(new FormData(form));
-      try {
-        const response = await fetch('/api/v1/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        const payload = await response.json();
-        status.textContent = payload.message || 'Message received.';
-        if (payload.success) form.reset();
-      } catch {
-        status.textContent = 'The message could not be sent.';
-      }
-    });
-  </script>
 </body>
 </html>

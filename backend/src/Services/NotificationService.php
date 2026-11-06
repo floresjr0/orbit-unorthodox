@@ -13,6 +13,7 @@ final class NotificationService
         'deadline_changed' => 'task_updated',
         'status_changed' => 'status_changed',
         'comment' => 'comments',
+        'mention' => 'comments',
         'progress' => 'comments',
         'announcement' => 'announcements',
         'deadline_reminder' => 'deadlines',

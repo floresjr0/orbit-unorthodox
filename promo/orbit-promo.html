@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ORBIT — promo</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #f4f1ea;
+      color: #1b1a17;
+      font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+    }
+    #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #f4f1ea; }
+    #glow {
+      position: absolute;
+      left: 50%;
+      top: 46%;
+      width: 1100px;
+      height: 1100px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(91, 76, 219, 0.18), rgba(196, 181, 253, 0.08) 42%, transparent 68%);
+      pointer-events: none;
+    }
+    #orbitField { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 1; }
+    .ring {
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 50%;
+    }
+    #ringOuter { border: 1.5px dashed rgba(91, 76, 219, 0.55); }
+    #ringInner { border: 1.5px solid rgba(196, 181, 253, 0.95); }
+    .sat {
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 50%;
+    }
+    #sat {
+      width: 18px;
+      height: 18px;
+      margin: -9px 0 0 -9px;
+      background: #f4f1ea;
+      box-shadow: 0 0 0 8px rgba(91, 76, 219, 0.16), 0 0 0 1.5px #5b4cdb;
+    }
+    #sat2 {
+      width: 10px;
+      height: 10px;
+      margin: -5px 0 0 -5px;
+      background: #5b4cdb;
+    }
+    #corner {
+      position: absolute;
+      z-index: 5;
+      top: 40px;
+      left: 48px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+    }
+    .scene { position: absolute; inset: 0; z-index: 2; }
+    .scene.split {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 108px 0 116px;
+    }
+    .scene.center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .copy { width: 680px; flex: none; }
+    .visual { width: 880px; flex: none; }
+    .kicker {
+      margin: 0 0 16px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #5b4cdb;
+    }
+    h2 {
+      margin: 0;
+      font-size: 68px;
+      line-height: 1.02;
+      letter-spacing: -0.045em;
+      font-weight: 650;
+      text-wrap: balance;
+    }
+    .sub {
+      margin: 18px 0 0;
+      max-width: 640px;
+      font-size: 26px;
+      line-height: 1.38;
+      font-weight: 520;
+      color: #5e5a53;
+    }
+    .bridge {
+      margin: 20px 0 0;
+      max-width: 600px;
+      font-size: 24px;
+      line-height: 1.35;
+      font-weight: 650;
+    }
+    #openWord {
+      margin: 0;
+      font-size: 112px;
+      line-height: 0.9;
+      font-weight: 650;
+      letter-spacing: 0.14em;
+    }
+    #openWord span { display: inline-block; }
+    #openSub {
+      margin: 28px auto 0;
+      max-width: 680px;
+      font-size: 32px;
+      line-height: 1.35;
+      font-weight: 520;
+      color: #5e5a53;
+    }
+    #codeCard {
+      background: #1b1a17;
+      color: #f4f1ea;
+      border-radius: 32px;
+      padding: 28px 34px 26px;
+      box-shadow: 0 30px 70px rgba(27, 26, 23, 0.18);
+    }
+    .codeTop { display: flex; align-items: center; gap: 12px; color: #c4b5fd; font-size: 13px; font-weight: 700; letter-spacing: 0.18em; }
+    .code {
+      margin-top: 12px;
+      font-size: 54px;
+      line-height: 1;
+      font-weight: 650;
+      letter-spacing: 0.07em;
+      white-space: nowrap;
+    }
+    .hint { margin-top: 12px; color: rgba(244, 241, 234, 0.68); font-size: 18px; }
+    .person {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: #fffcf8;
+      border: 1px solid rgba(27, 26, 23, 0.08);
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(27, 26, 23, 0.05);
+    }
+    .av {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 18px;
+      flex: none;
+    }
+    .av.m { background: #5b4cdb; color: #f4f1ea; }
+    .av.l { background: #1b1a17; color: #f4f1ea; }
+    .av.a { background: #c4b5fd; color: #1b1a17; }
+    .who b { display: block; font-size: 18px; }
+    .who small { color: #6b665e; font-size: 14px; }
+    #joinCap { min-height: 28px; margin: 14px 0 0; color: #5e5a53; font-size: 18px; }
+    #taskHead { display: flex; justify-content: space-between; align-items: flex-end; min-height: 74px; }
+    .taskk { font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #5b4cdb; }
+    .taskname { margin-top: 4px; font-size: 30px; font-weight: 650; letter-spacing: -0.03em; }
+    #assignedPill {
+      background: #ece9ff;
+      color: #5b4cdb;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    #searchBox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: #fffcf8;
+      border-radius: 999px;
+      border: 1.5px solid rgba(91, 76, 219, 0.28);
+      box-shadow: 0 12px 30px rgba(91, 76, 219, 0.08);
+      font-size: 20px;
+      font-weight: 600;
+    }
+    #searchCaret { width: 2px; height: 22px; background: #5b4cdb; display: inline-block; }
+    .person.work { margin-top: 8px; }
+    .check {
+      margin-left: auto;
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      border: 1.5px solid rgba(27, 26, 23, 0.28);
+      display: grid;
+      place-items: center;
+      flex: none;
+    }
+    .piles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .pile {
+      background: #fffcf8;
+      border-radius: 22px;
+      padding: 14px;
+      min-height: 124px;
+      border: 1px solid rgba(27, 26, 23, 0.08);
+      box-shadow: 0 12px 30px rgba(27, 26, 23, 0.04);
+    }
+    .pile h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
+    .pile.done h3 { color: #5b4cdb; }
+    .pile.not h3 { color: #1b1a17; }
+    .pile.pend h3 { color: #6b665e; }
+    .taskpill { background: #f4f1ea; border-radius: 12px; padding: 10px 12px; font-size: 16px; font-weight: 650; }
+    .dcard {
+      background: #fffcf8;
+      border-radius: 26px;
+      padding: 20px 22px 18px;
+      border: 1px solid rgba(27, 26, 23, 0.08);
+      box-shadow: 0 18px 44px rgba(27, 26, 23, 0.06);
+    }
+    #drive2 { margin-top: 14px; }
+    .dtop { display: flex; justify-content: space-between; align-items: center; }
+    .dlabel { font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #5b4cdb; }
+    .dpill { font-size: 14px; font-weight: 700; background: #ece9ff; color: #5b4cdb; border-radius: 999px; padding: 7px 12px; }
+    .dpill.dark { background: #1b1a17; color: #f4f1ea; }
+    .dtitle { margin-top: 10px; font-size: 28px; font-weight: 650; letter-spacing: -0.03em; }
+    .durl { margin-top: 4px; color: #5b4cdb; font-size: 18px; font-weight: 600; }
+    #driveCaps { min-height: 64px; margin-top: 16px; }
+    #driveCaps p { margin: 0; font-size: 20px; font-weight: 650; }
+    #driveCap2 { margin-top: 4px !important; color: #5e5a53; font-weight: 520 !important; }
+    .talkgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .panel {
+      background: #fffcf8;
+      border-radius: 24px;
+      padding: 16px 16px 8px;
+      border: 1px solid rgba(27, 26, 23, 0.08);
+      box-shadow: 0 18px 40px rgba(27, 26, 23, 0.06);
+    }
+    .panel header { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #5b4cdb; font-weight: 700; margin-bottom: 10px; }
+    .msg { background: #f4f1ea; border-radius: 16px; padding: 10px 12px; margin-bottom: 8px; }
+    .msg b { display: block; font-size: 13px; margin-bottom: 2px; }
+    .msg span { font-size: 17px; font-weight: 600; line-height: 1.35; }
+    #chatLine2 { overflow: hidden; margin-bottom: 0; }
+    #mention { color: #5b4cdb; font-style: normal; font-weight: 750; padding: 0 3px; border-radius: 6px; display: inline-block; }
+    #alertRow { min-height: 48px; display: flex; gap: 10px; margin-top: 16px; }
+    .alert {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1b1a17;
+      color: #f4f1ea;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font-size: 16px;
+      font-weight: 650;
+    }
+    .alert i { width: 8px; height: 8px; border-radius: 50%; background: #c4b5fd; display: block; }
+    #smallA, #smallB {
+      margin: 0;
+      font-size: 88px;
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+      font-weight: 650;
+    }
+    #smallB { color: #5b4cdb; margin-top: 4px; }
+    .principles { list-style: none; padding: 0; margin: 28px 0 0; }
+    .principles li { margin: 8px 0; font-size: 28px; font-weight: 600; color: #2a2825; }
+    .principles span { color: #5b4cdb; font-size: 15px; letter-spacing: 0.14em; margin-right: 14px; font-weight: 700; }
+    #profile {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 28px;
+      padding: 10px 18px 10px 10px;
+      border-radius: 999px;
+      background: #fffcf8;
+      border: 1px solid rgba(27, 26, 23, 0.1);
+      box-shadow: 0 16px 40px rgba(27, 26, 23, 0.08);
+      font-size: 18px;
+      font-weight: 650;
+    }
+    #profile .av { width: 40px; height: 40px; font-size: 16px; }
+    .dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.35; }
+    .stack { position: relative; width: 58px; height: 1.2em; }
+    .stack em { position: absolute; inset: 0; font-style: normal; text-align: center; }
+    #profileCap { margin: 16px 0 0; font-size: 22px; color: #5e5a53; font-weight: 520; }
+    #endKicker { letter-spacing: 0.16em; }
+    #endMark { width: 104px; height: 104px; }
+    #endWord { margin: 18px 0 0; font-size: 84px; font-weight: 700; letter-spacing: 0.18em; line-height: 1; }
+    #endRule { width: 72px; height: 3px; background: #5b4cdb; margin: 18px auto 0; transform-origin: center; }
+    #endLine { margin: 20px 0 0; font-size: 34px; font-weight: 650; letter-spacing: -0.03em; }
+    #endPunch { margin: 8px 0 0; font-size: 26px; color: #5e5a53; font-weight: 520; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="glow"></div>
+    <div id="orbitField">
+      <div class="ring" id="ringOuter"></div>
+      <div class="ring" id="ringInner"></div>
+      <i class="sat" id="sat2"></i>
+      <i class="sat" id="sat"></i>
+    </div>
+    <div id="corner">ORBIT</div>
+
+    <section class="scene center" id="sceneOpen">
+      <h1 id="openWord"><span>O</span><span>R</span><span>B</span><span>I</span><span>T</span></h1>
+      <p id="openSub">One place for a group to get work done.</p>
+    </section>
+
+    <section class="scene split" id="sceneJoin">
+      <div class="copy">
+        <p class="kicker" id="joinKicker">The group</p>
+        <h2 id="joinTitle">Share one code.</h2>
+        <p class="sub" id="joinSub">A leader starts a group. Members join.</p>
+        <p class="bridge" id="joinBridge">From there, work is assigned, finished, and talked about.</p>
+      </div>
+      <div class="visual">
+        <article id="codeCard">
+          <div class="codeTop">
+            <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+              <rect width="32" height="32" rx="8" fill="#f4f1ea"/>
+              <circle cx="16" cy="16" r="6" fill="none" stroke="#5b4cdb" stroke-width="1.6"/>
+              <circle cx="16" cy="16" r="11" fill="none" stroke="#c4b5fd" stroke-width="1.3"/>
+              <circle cx="25" cy="12" r="2" fill="#5b4cdb"/>
+            </svg>
+            <span>GROUP CODE</span>
+          </div>
+          <div class="code">K7MQ-R2NP-4H8W</div>
+          <div class="hint">Members join with this code.</div>
+        </article>
+        <div class="person" id="mem1"><span class="av m">M</span><span class="who"><b>Maya</b><small>Joined</small></span></div>
+        <div class="person" id="mem2"><span class="av l">L</span><span class="who"><b>Luis</b><small>Joined</small></span></div>
+        <div class="person" id="mem3"><span class="av a">A</span><span class="who"><b>Aya</b><small>Joined</small></span></div>
+        <p id="joinCap">The leader sees the group, the members, and the code.</p>
+      </div>
+    </section>
+
+    <section class="scene split" id="sceneWork">
+      <div class="copy">
+        <p class="kicker" id="workKicker">The work</p>
+        <h2 id="workTitle">Who is doing what.</h2>
+        <p class="sub" id="workSub">Search a name. Check the people who share the task. Assign it to one person, or to several.</p>
+      </div>
+      <div class="visual">
+        <div id="taskHead">
+          <div>
+            <div class="taskk">Field study</div>
+            <div class="taskname">Draft the research brief</div>
+          </div>
+          <div id="assignedPill">Maya · Luis</div>
+        </div>
+        <div id="searchBox">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5b4cdb" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2" stroke-linecap="round"/></svg>
+          <span id="searchText">Search a name</span><i id="searchCaret"></i>
+        </div>
+        <div class="person work" id="mayaRow"><span class="av m">M</span><span class="who"><b>Maya</b></span><span class="check" id="mayaBox"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path id="mayaTick" d="M5 12.5l5 5L19 7" fill="none" stroke="#f4f1ea" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <div class="person work" id="luisRow"><span class="av l">L</span><span class="who"><b>Luis</b></span><span class="check" id="luisBox"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path id="luisTick" d="M5 12.5l5 5L19 7" fill="none" stroke="#f4f1ea" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <div class="person work" id="ayaRow"><span class="av a">A</span><span class="who"><b>Aya</b></span><span class="check" id="ayaBox"></span></div>
+        <div class="piles">
+          <article class="pile done" id="pileDone"><h3>Done</h3><div class="taskpill">Source list</div></article>
+          <article class="pile not" id="pileNot"><h3>Not done</h3><div class="taskpill">Research brief</div></article>
+          <article class="pile pend" id="pilePend"><h3>Pending</h3><div class="taskpill">Review notes</div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene split" id="sceneDrive">
+      <div class="copy">
+        <p class="kicker" id="driveKicker">The file</p>
+        <h2 id="driveTitle">It stays in Google Drive.</h2>
+        <p class="sub" id="driveSub">A member pastes the Drive link to mark the task done. A leader can paste a link as the instructions, and the member can preview it.</p>
+      </div>
+      <div class="visual">
+        <article class="dcard" id="drive1">
+          <div class="dtop"><span class="dlabel">Instructions</span><span class="dpill">Preview</span></div>
+          <div class="dtitle">Research brief</div>
+          <div class="durl">drive.google.com/file/brief</div>
+        </article>
+        <article class="dcard" id="drive2">
+          <div class="dtop"><span class="dlabel">Finished work</span><span class="dpill dark">Mark done</span></div>
+          <div class="dtitle">Draft file</div>
+          <div class="durl">drive.google.com/file/draft</div>
+        </article>
+        <div id="driveCaps">
+          <p id="driveCap">ORBIT keeps the link, not the file.</p>
+          <p id="driveCap2">The list stays light.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene split" id="sceneTalk">
+      <div class="copy">
+        <p class="kicker" id="talkKicker">The talk</p>
+        <h2 id="talkTitle">Two ways to talk.</h2>
+        <p class="sub" id="talkSub">Comments stay on the task. Chat is for everyone in the group. Type @ to mention a person, and they get an alert.</p>
+      </div>
+      <div class="visual">
+        <div class="talkgrid">
+          <article class="panel" id="talkComments">
+            <header>On the task</header>
+            <div class="msg"><b>Leader</b><span>Keep the sources in the doc.</span></div>
+            <div class="msg"><b>Maya</b><span>Posted the Drive link.</span></div>
+          </article>
+          <article class="panel" id="talkChat">
+            <header>Chat · everyone</header>
+            <div class="msg"><b>Luis</b><span>Are we still on for Friday?</span></div>
+            <div class="msg" id="chatLine2"><b>Aya</b><span>Yes — <em id="mention">@Maya</em> can you confirm?</span></div>
+          </article>
+        </div>
+        <div id="alertRow">
+          <div class="alert" id="alert1"><i></i>Maya finished the brief</div>
+          <div class="alert" id="alert2"><i></i>A due date is close</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene center" id="sceneSmall">
+      <p class="kicker" id="smallKicker">Stays small</p>
+      <h2 id="smallA">One code.</h2>
+      <h2 id="smallB">It does not change.</h2>
+      <ul class="principles">
+        <li id="row1"><span>01</span>A leader can run more than one group.</li>
+        <li id="row2"><span>02</span>A member can join more than one.</li>
+        <li id="row3"><span>03</span>When the project is over, the leader closes the group.</li>
+      </ul>
+      <div id="profile">
+        <span class="av m">M</span>
+        <span>Maya</span>
+        <i class="dot"></i>
+        <span class="stack"><em id="lightLabel">Light</em><em id="darkLabel">Dark</em></span>
+        <i class="dot"></i>
+        <span>Alerts on</span>
+      </div>
+      <p id="profileCap">Names, light or dark appearance, and notification choices live on the profile.</p>
+    </section>
+
+    <section class="scene center" id="sceneEnd">
+      <p class="kicker" id="endKicker">A class · A project team · A small crew</p>
+      <svg id="endMark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#1b1a17"/>
+        <circle cx="16" cy="16" r="6" fill="none" stroke="#c4b5fd" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="11" fill="none" stroke="#5b4cdb" stroke-width="1.3"/>
+        <circle cx="25" cy="12" r="2" fill="#f4f1ea"/>
+      </svg>
+      <div id="endWord">ORBIT</div>
+      <div id="endRule"></div>
+      <p id="endLine">The screen shows the work.</p>
+      <p id="endPunch">Not a dashboard full of extras.</p>
+    </section>
+  </div>
+  <script>
+    const DURATION = 42;
+    const OUTER = 940;
+    const INNER = 700;
+    const q = new URLSearchParams(location.search);
+    const $ = (id) => document.getElementById(id);
+
+    const ringOuter = $('ringOuter');
+    const ringInner = $('ringInner');
+    ringOuter.style.width = ringOuter.style.height = OUTER + 'px';
+    ringInner.style.width = ringInner.style.height = INNER + 'px';
+
+    const letters = [...$('openWord').children];
+    const W = {
+      open:  [0.0, 0.35, 5.05, 5.75],
+      join:  [5.1, 5.75, 10.75, 11.5],
+      work:  [10.8, 11.45, 16.95, 17.7],
+      drive: [17.0, 17.65, 22.55, 23.3],
+      talk:  [22.6, 23.25, 28.75, 29.5],
+      small: [28.8, 29.45, 35.45, 36.2],
+      end:   [35.55, 36.3, 42, 42]
+    };
+
+    function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function easeOut(t) { t = clamp01(t); return 1 - Math.pow(1 - t, 3); }
+    function easeInOut(t) {
+      t = clamp01(t);
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    function span(t, a, b) {
+      if (b <= a) return t >= a ? 1 : 0;
+      return clamp01((t - a) / (b - a));
+    }
+    function enter(t, a, b) { return easeOut(span(t, a, b)); }
+    function sceneOpacity(t, w) {
+      return Math.min(easeInOut(span(t, w[0], w[1])), 1 - easeInOut(span(t, w[2], w[3])));
+    }
+    function group(el, p) { el.style.opacity = p.toFixed(4); }
+    function item(el, local, opt) {
+      const o = opt || {};
+      const y = o.y == null ? 16 : o.y;
+      const x = o.x || 0;
+      const blur = o.blur == null ? 4 : o.blur;
+      const from = o.scale == null ? 1 : o.scale;
+      const sc = from + (1 - from) * local;
+      el.style.opacity = local.toFixed(4);
+      el.style.transform = 'translate3d(' + ((1 - local) * x).toFixed(2) + 'px,' + ((1 - local) * y).toFixed(2) + 'px,0) scale(' + sc.toFixed(4) + ')';
+      el.style.filter = 'blur(' + ((1 - local) * blur).toFixed(2) + 'px)';
+    }
+    function mix(a, b, p) {
+      const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
+      const pb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
+      const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * p));
+      return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+    }
+    function setCheck(box, path, p) {
+      const on = p > 0.04;
+      box.style.background = on ? '#5b4cdb' : 'transparent';
+      box.style.borderColor = on ? '#5b4cdb' : 'rgba(27,26,23,0.28)';
+      if (path) {
+        path.style.strokeDasharray = '24';
+        path.style.strokeDashoffset = String(24 * (1 - p));
+      }
+    }
+    function placeSat(el, radius, angle) {
+      el.style.transform = 'translate(' + (Math.cos(angle) * radius).toFixed(2) + 'px,' + (Math.sin(angle) * radius).toFixed(2) + 'px)';
+    }
+
+    function draw(t) {
+      const fadeIn = enter(t, 0.05, 0.7);
+      const fadeOut = 1 - enter(t, 4.85, 5.7);
+      const fadeBack = enter(t, 35.3, 36.25);
+      const orbit = fadeIn * Math.max(fadeOut, fadeBack);
+      $('orbitField').style.opacity = orbit.toFixed(4);
+      $('orbitField').style.transform = 'scale(' + (0.94 + 0.06 * enter(t, 0.1, 1.2)).toFixed(4) + ')';
+      ringOuter.style.transform = 'translate(-50%,-50%) rotate(' + (t * 16).toFixed(2) + 'deg)';
+      ringInner.style.transform = 'translate(-50%,-50%) rotate(' + (-t * 22).toFixed(2) + 'deg)';
+      placeSat($('sat'), OUTER / 2, t * 0.55 - 0.6);
+      placeSat($('sat2'), INNER / 2, Math.PI * 0.85 - t * 0.8);
+
+      const mid = enter(t, 5.35, 6.05) * (1 - enter(t, 35.15, 35.9));
+      item($('corner'), mid, { y: 8, blur: 0 });
+
+      group($('sceneOpen'), sceneOpacity(t, W.open));
+      $('openWord').style.letterSpacing = (0.36 - 0.22 * enter(t, 0.15, 1.45)).toFixed(4) + 'em';
+      letters.forEach((el, i) => item(el, enter(t, 0.22 + i * 0.07, 0.85 + i * 0.07), { y: 26, blur: 6 }));
+      item($('openSub'), enter(t, 1.25, 2.0), { y: 16, blur: 4 });
+
+      group($('sceneJoin'), sceneOpacity(t, W.join));
+      item($('joinKicker'), enter(t, 5.25, 5.8), { y: 10, blur: 2 });
+      item($('joinTitle'), enter(t, 5.4, 6.15), { y: 20, blur: 5 });
+      item($('joinSub'), enter(t, 5.95, 6.6), { y: 14, blur: 3 });
+      item($('joinBridge'), enter(t, 8.55, 9.25), { y: 12, blur: 2 });
+      item($('codeCard'), enter(t, 6.25, 7.1), { y: 22, blur: 5, scale: 0.96 });
+      item($('mem1'), enter(t, 7.15, 7.75), { x: 28, y: 0, blur: 2 });
+      item($('mem2'), enter(t, 7.4, 8.0), { x: 28, y: 0, blur: 2 });
+      item($('mem3'), enter(t, 7.65, 8.25), { x: 28, y: 0, blur: 2 });
+      item($('joinCap'), enter(t, 8.45, 9.1), { y: 10, blur: 2 });
+
+      group($('sceneWork'), sceneOpacity(t, W.work));
+      item($('workKicker'), enter(t, 11.0, 11.5), { y: 10, blur: 2 });
+      item($('workTitle'), enter(t, 11.15, 11.85), { y: 18, blur: 5 });
+      item($('workSub'), enter(t, 11.65, 12.35), { y: 12, blur: 3 });
+      item($('taskHead'), enter(t, 11.35, 12.0), { y: 12, blur: 2 });
+      item($('searchBox'), enter(t, 12.05, 12.65), { y: 12, blur: 2 });
+      const typed = Math.floor(enter(t, 12.4, 13.05) * 4);
+      const searchText = $('searchText');
+      if (typed === 0) {
+        searchText.textContent = 'Search a name';
+        searchText.style.color = '#a39e94';
+      } else {
+        searchText.textContent = 'Maya'.slice(0, typed);
+        searchText.style.color = '#1b1a17';
+      }
+      $('searchCaret').style.opacity = (0.25 + 0.75 * (Math.sin(t * 9) > 0 ? 1 : 0)).toFixed(2);
+      const mayaOn = enter(t, 12.85, 13.35);
+      $('mayaRow').style.background = mix('#fffcf8', '#ece9ff', mayaOn);
+      item($('mayaRow'), enter(t, 12.55, 13.1), { x: 20, y: 0, blur: 0 });
+      item($('luisRow'), enter(t, 12.8, 13.35), { x: 20, y: 0, blur: 0 });
+      item($('ayaRow'), enter(t, 13.05, 13.6), { x: 20, y: 0, blur: 0 });
+      setCheck($('mayaBox'), $('mayaTick'), enter(t, 13.45, 13.95));
+      setCheck($('luisBox'), $('luisTick'), enter(t, 13.8, 14.3));
+      item($('assignedPill'), enter(t, 14.15, 14.7), { y: 8, blur: 0, scale: 0.96 });
+      item($('pileDone'), enter(t, 14.35, 15.0), { y: 18, blur: 3 });
+      item($('pileNot'), enter(t, 14.6, 15.25), { y: 18, blur: 3 });
+      item($('pilePend'), enter(t, 14.85, 15.5), { y: 18, blur: 3 });
+
+      group($('sceneDrive'), sceneOpacity(t, W.drive));
+      item($('driveKicker'), enter(t, 17.15, 17.65), { y: 10, blur: 2 });
+      item($('driveTitle'), enter(t, 17.3, 18.0), { y: 18, blur: 5 });
+      item($('driveSub'), enter(t, 17.85, 18.55), { y: 12, blur: 3 });
+      item($('drive1'), enter(t, 18.15, 18.85), { y: 18, blur: 4, scale: 0.98 });
+      item($('drive2'), enter(t, 18.7, 19.4), { y: 18, blur: 4, scale: 0.98 });
+      item($('driveCap'), enter(t, 19.7, 20.35), { y: 10, blur: 2 });
+      item($('driveCap2'), enter(t, 20.25, 20.85), { y: 10, blur: 2 });
+
+      group($('sceneTalk'), sceneOpacity(t, W.talk));
+      item($('talkKicker'), enter(t, 22.75, 23.25), { y: 10, blur: 2 });
+      item($('talkTitle'), enter(t, 22.9, 23.6), { y: 18, blur: 5 });
+      item($('talkSub'), enter(t, 23.4, 24.1), { y: 12, blur: 3 });
+      item($('talkComments'), enter(t, 23.55, 24.25), { y: 16, blur: 3, scale: 0.98 });
+      item($('talkChat'), enter(t, 24.05, 24.75), { y: 16, blur: 3, scale: 0.98 });
+      const line = enter(t, 25.05, 25.7);
+      item($('chatLine2'), line, { y: 8, blur: 0 });
+      $('chatLine2').style.maxHeight = (line * 86) + 'px';
+      const mention = enter(t, 25.7, 26.25);
+      $('mention').style.backgroundColor = 'rgba(91,76,219,' + (0.16 * mention).toFixed(3) + ')';
+      $('mention').style.transform = 'scale(' + (1 + 0.05 * Math.sin(mention * Math.PI)).toFixed(4) + ')';
+      item($('alert1'), enter(t, 26.35, 26.95), { y: 12, blur: 2, scale: 0.97 });
+      item($('alert2'), enter(t, 26.85, 27.45), { y: 12, blur: 2, scale: 0.97 });
+
+      group($('sceneSmall'), sceneOpacity(t, W.small));
+      item($('smallKicker'), enter(t, 28.95, 29.5), { y: 10, blur: 2 });
+      item($('smallA'), enter(t, 29.15, 29.9), { y: 22, blur: 6 });
+      item($('smallB'), enter(t, 29.8, 30.6), { y: 22, blur: 6 });
+      item($('row1'), enter(t, 30.7, 31.3), { y: 12, blur: 2 });
+      item($('row2'), enter(t, 31.25, 31.85), { y: 12, blur: 2 });
+      item($('row3'), enter(t, 31.8, 32.4), { y: 12, blur: 2 });
+      item($('profile'), enter(t, 32.55, 33.25), { y: 14, blur: 2, scale: 0.98 });
+      item($('profileCap'), enter(t, 33.1, 33.75), { y: 10, blur: 2 });
+      const dark = enter(t, 33.75, 34.5);
+      $('profile').style.background = mix('#fffcf8', '#1b1a17', dark);
+      $('profile').style.color = mix('#1b1a17', '#f4f1ea', dark);
+      $('profile').style.borderColor = dark > 0.6 ? 'transparent' : 'rgba(27,26,23,0.1)';
+      $('lightLabel').style.opacity = String(1 - dark);
+      $('darkLabel').style.opacity = String(dark);
+
+      group($('sceneEnd'), sceneOpacity(t, W.end));
+      item($('endKicker'), enter(t, 35.7, 36.35), { y: 10, blur: 2 });
+      item($('endMark'), enter(t, 35.95, 36.75), { y: 0, blur: 4, scale: 0.82 });
+      item($('endWord'), enter(t, 36.4, 37.15), { y: 16, blur: 5 });
+      const rule = enter(t, 36.9, 37.45);
+      $('endRule').style.opacity = rule.toFixed(4);
+      $('endRule').style.transform = 'scaleX(' + rule.toFixed(4) + ')';
+      item($('endLine'), enter(t, 37.15, 37.8), { y: 12, blur: 3 });
+      item($('endPunch'), enter(t, 37.65, 38.3), { y: 12, blur: 3 });
+    }
+
+    window.ORBIT_DURATION = DURATION;
+    window.renderAt = draw;
+    draw(0);
+
+    if (!q.has('capture')) {
+      let start = 0;
+      const tick = (now) => {
+        if (!start) start = now;
+        const t = Math.min((now - start) / 1000, DURATION);
+        draw(t);
+        if (t < DURATION) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>

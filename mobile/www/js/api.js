@@ -14,6 +14,7 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
     this.payload = payload;
+    this.signedOut = false;
   }
 }
 
@@ -62,10 +63,19 @@ export async function api(path, options = {}) {
     throw new OfflineError();
   }
   if (response.status === 401 && options.auth !== false && !options.retried) {
-    const ok = await refreshSession();
-    if (ok) return api(path, { ...options, retried: true });
+    const hadSession = Boolean(state.refresh || state.access);
+    if (state.refresh) {
+      const ok = await refreshSession();
+      if (ok) return api(path, { ...options, retried: true });
+    }
     await clearSession();
-    throw new ApiError('Your session has expired. Please sign in again.', 401, null);
+    const error = new ApiError(
+      hadSession ? 'Your session has expired. Please sign in again.' : 'Please sign in to continue.',
+      401,
+      null
+    );
+    error.signedOut = true;
+    throw error;
   }
   const payload = await response.json().catch(() => null);
   state.offline = false;

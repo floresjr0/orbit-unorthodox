@@ -378,6 +378,98 @@ final class TeamService
         });
     }
 
+    public function messages(array $user, int $teamId): array
+    {
+        $this->app->get(Access::class)->requireActiveMember($teamId, (int) $user['id']);
+        $stmt = $this->app->pdo()->prepare(
+            'SELECT * FROM (
+                SELECT * FROM team_messages WHERE team_id = ? ORDER BY id DESC LIMIT 100
+             ) recent ORDER BY id ASC'
+        );
+        $stmt->execute([$teamId]);
+
+        return array_map([Present::class, 'message'], $stmt->fetchAll());
+    }
+
+    public function postMessage(array $user, int $teamId, string $body): array
+    {
+        $this->app->get(Access::class)->requireActiveMember($teamId, (int) $user['id']);
+        $this->assertMutable($teamId);
+        $body = trim($body);
+        if (mb_strlen($body) < 1 || mb_strlen($body) > 2000) {
+            throw new HttpException(422, 'A message must be between 1 and 2000 characters.');
+        }
+        $stmt = $this->app->pdo()->prepare(
+            'INSERT INTO team_messages (team_id, user_id, author_name, body, created_at)
+             VALUES (?, ?, ?, ?, UTC_TIMESTAMP())'
+        );
+        $stmt->execute([$teamId, $user['id'], $user['full_name'], $body]);
+        $id = (int) $this->app->pdo()->lastInsertId();
+        $mentioned = $this->mentionIds($teamId, $body, (int) $user['id']);
+        if ($mentioned) {
+            $this->app->get(NotificationService::class)->notifyMany(
+                $mentioned,
+                'mention',
+                $user['full_name'] . ' mentioned you',
+                mb_substr($body, 0, 140),
+                ['team_id' => $teamId, 'message_id' => $id],
+                $teamId
+            );
+        }
+        $row = $this->app->pdo()->prepare('SELECT * FROM team_messages WHERE id = ?');
+        $row->execute([$id]);
+
+        return Present::message($row->fetch());
+    }
+
+    public function mentionIds(int $teamId, string $body, int $except): array
+    {
+        $stmt = $this->app->pdo()->prepare(
+            'SELECT tm.user_id, u.full_name
+             FROM team_members tm JOIN users u ON u.id = tm.user_id
+             WHERE tm.team_id = ? AND tm.status = "active"'
+        );
+        $stmt->execute([$teamId]);
+        $members = $stmt->fetchAll();
+        usort($members, static fn (array $a, array $b): int => mb_strlen((string) $b['full_name']) <=> mb_strlen((string) $a['full_name']));
+        $lower = mb_strtolower($body);
+        $taken = [];
+        $ids = [];
+        foreach ($members as $member) {
+            $name = trim((string) $member['full_name']);
+            $userId = (int) $member['user_id'];
+            if ($name === '' || $userId === $except) {
+                continue;
+            }
+            $needle = '@' . mb_strtolower($name);
+            $offset = 0;
+            $hit = false;
+            while (($pos = mb_strpos($lower, $needle, $offset)) !== false) {
+                $end = $pos + mb_strlen($needle);
+                $after = mb_substr($lower, $end, 1);
+                $free = true;
+                for ($i = $pos; $i < $end; $i++) {
+                    if (!empty($taken[$i])) {
+                        $free = false;
+                    }
+                }
+                $boundary = $after === '' || !preg_match('/[\p{L}\p{N}]/u', $after);
+                if ($free && $boundary) {
+                    for ($i = $pos; $i < $end; $i++) {
+                        $taken[$i] = true;
+                    }
+                    $hit = true;
+                }
+                $offset = $pos + 1;
+            }
+            if ($hit) {
+                $ids[] = $userId;
+            }
+        }
+
+        return $ids;
+    }
+
     public function announcements(array $user, int $teamId): array
     {
         $this->app->get(Access::class)->requireActiveMember($teamId, (int) $user['id']);

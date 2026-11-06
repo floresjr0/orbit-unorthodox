@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#11121A">
+  <meta name="theme-color" content="#f2f2f7">
   <title>ORBIT</title>
   <link rel="icon" href="assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,8 +12,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script>
     (function () {
-      var choice = localStorage.getItem('orbit.theme') || 'system';
-      var dark = choice === 'dark' || (choice !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = localStorage.getItem('orbit.theme') === 'dark';
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     })();
   </script>

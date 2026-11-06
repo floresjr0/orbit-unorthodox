@@ -71,6 +71,8 @@ return static function (Router $router): void {
     $router->add('PUT', '/v1/teams/{id}/invitation', TeamController::class, 'updateInvitation', $auth);
     $router->add('POST', '/v1/teams/{id}/invitation/regenerate', TeamController::class, 'regenerate', $auth);
     $router->add('POST', '/v1/invitations/join', TeamController::class, 'join', $auth);
+    $router->add('GET', '/v1/teams/{id}/messages', TeamController::class, 'messages', $auth);
+    $router->add('POST', '/v1/teams/{id}/messages', TeamController::class, 'postMessage', $auth);
     $router->add('GET', '/v1/teams/{id}/announcements', TeamController::class, 'announcements', $auth);
     $router->add('POST', '/v1/teams/{id}/announcements', TeamController::class, 'createAnnouncement', $auth);
     $router->add('DELETE', '/v1/announcements/{id}', TeamController::class, 'deleteAnnouncement', $auth);

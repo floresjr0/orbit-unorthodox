@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Download ORBIT</title>
+  <title>Download the ORBIT Android app</title>
+  <meta name="description" content="Download the ORBIT Android APK from Unorthodox Technologies. The file appears here after a release is published.">
   <link rel="icon" href="assets/mark.svg">
   <link rel="stylesheet" href="css/site.css">
+  <script src="js/seo.js" defer></script>
 </head>
 <body>
   <header class="nav">
     <a class="brand" href="index.html">ORBIT</a>
-    <nav><a href="about.html">About</a><a href="../mobile/www/index.html">Open app</a></nav>
+    <nav><a href="about.html">About</a><a href="contact.html">Contact</a></nav>
   </header>
   <main class="page">
     <p class="kicker">Android</p>
-    <h1>Download</h1>
-    <p id="release">Checking for a published build…</p>
-    <p>You can also open the app in a browser on this server while you develop.</p>
-    <p><a class="btn" href="../mobile/www/index.html">Open the browser app</a></p>
+    <h1>Get the Android app</h1>
+    <div class="release-note" id="release">Checking for a published build…</div>
   </main>
   <script>
     const slot = document.getElementById('release');
@@ -25,15 +25,15 @@
       const release = body.data;
       slot.replaceChildren();
       if (!release || !release.available) {
-        slot.textContent = 'No Android build is published yet. A download link appears here after a platform administrator publishes an APK.';
+        slot.textContent = 'No Android build is published yet. The APK download appears here after a platform administrator publishes a release.';
         return;
       }
       const text = document.createElement('p');
       text.textContent = 'Version ' + release.version + '. ' + release.changelog;
       const link = document.createElement('a');
-      link.className = 'btn solid';
+      link.className = 'btn';
       link.href = '/api/v1/releases/' + release.id + '/download';
-      link.textContent = 'Download APK';
+      link.textContent = 'Get the Android app';
       slot.append(text, link);
     }).catch(() => {
       slot.textContent = 'The release list could not be loaded.';

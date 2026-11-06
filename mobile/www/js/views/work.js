@@ -2,12 +2,12 @@ import { api, ApiError, OfflineError } from '../api.js';
 import { apiBase } from '../config.js';
 import { state } from '../state.js';
 import { db } from '../db.js';
-import { isLeader, loadTasks, loadTeams } from '../data.js';
+import { accountIsLeader, isLeader, loadTasks, loadTeams } from '../data.js';
 import { navigate } from '../router.js';
 import { queueComment, queueStatus, syncNow } from '../sync.js';
 import {
-  PRIORITY_LABEL, STATUS_LABEL, badge, confirmDialog, el, emptyState, errorState, field,
-  formatWhen, setBusy, skeleton, statusBadge, taskCard, textInput, toast,
+  PRIORITY_LABEL, STATUS_LABEL, badge, confirmDialog, el, emptyState, field, presentError,
+  bubble, formatWhen, searchList, setBusy, skeleton, statusBadge, talkForm, taskCard, textInput, toast,
 } from '../ui.js';
 
 function screen(title, body, actions = []) {
@@ -18,64 +18,56 @@ function screen(title, body, actions = []) {
 }
 
 export async function renderDashboard(root) {
-  root.append(skeleton(4));
+  root.append(skeleton(3));
   try {
-    let data = null;
-    if (navigator.onLine) {
-      try {
-        data = (await api('/dashboard')).data;
-        await db.setMeta('dashboard', JSON.stringify(data));
-      } catch (error) {
-        if (!(error instanceof OfflineError)) throw error;
-      }
-    }
-    if (!data) {
-      const cached = await db.meta('dashboard');
-      data = cached ? JSON.parse(cached) : null;
-    }
-    root.replaceChildren();
-    if (!data) {
-      root.append(emptyState('Your workspace is empty', 'Connect once to load teams and tasks.'));
+    const all = await loadTeams();
+    const teams = all.filter((team) => team.status !== 'archived' && team.membership_status !== 'pending');
+    const leader = await accountIsLeader(all);
+    const led = teams.filter((team) => team.role === 'leader');
+    if (!led.length) {
+      const tasks = await loadTasks('scope=mine');
+      const action = leader
+        ? el('button', { class: 'btn primary', type: 'button', onclick: () => navigate('team-new') }, 'Create a group')
+        : el('button', { class: 'btn primary', type: 'button', onclick: () => navigate('join') }, 'Join a group');
+      root.replaceChildren(screen('My work', taskGroups(tasks), [action]));
       return;
     }
-    const leader = data.leader;
-    const member = data.member;
-    const blocks = [];
-    if (!navigator.onLine) blocks.push(el('p', { class: 'note' }, 'Showing the last saved dashboard.'));
-    if (leader) {
-      blocks.push(el('div', { class: 'stats' }, [
-        stat('Teams', leader.total_teams),
-        stat('Members', leader.total_members),
-        stat('Tasks', leader.total_tasks),
-        stat('Done', leader.completed_tasks),
-        stat('In progress', leader.in_progress_tasks),
-        stat('Pending', leader.pending_tasks),
-        stat('Overdue', leader.overdue_tasks),
-        stat('To review', leader.awaiting_approval),
-      ]));
-      blocks.push(section('Needs attention', leader.members.filter((person) => person.overdue_count > 0).map((person) =>
-        el('div', { class: 'person' }, [
-          el('strong', {}, person.full_name),
-          el('span', { class: 'muted' }, `${person.completed_count}/${person.assigned_count} done · ${person.overdue_count} overdue`),
-        ])
-      ), 'Everyone is on track.'));
-      blocks.push(section('Upcoming deadlines', leader.upcoming.map((task) => taskCard(task, () => navigate('task', { id: task.id }))), 'No upcoming deadlines.'));
-      blocks.push(section('Recent activity', leader.activity.map(activityLine), 'No activity yet.'));
-    }
-    blocks.push(section('Due today', (member.due_today || []).map((task) => taskCard(task, () => navigate('task', { id: task.id }))), 'Nothing is due today.'));
-    blocks.push(section('My overdue work', (member.overdue || []).map((task) => taskCard(task, () => navigate('task', { id: task.id }))), 'No overdue assignments.'));
-    blocks.push(section('Announcements', (member.announcements || []).map((item) => el('article', { class: 'card' }, [
-      item.is_important ? badge('urgent', 'Important') : null,
-      el('h3', {}, item.title),
-      el('p', {}, item.body),
-      el('span', { class: 'muted' }, item.author_name),
-    ])), 'No announcements.'));
-    root.append(screen(leader ? 'Team pulse' : 'My work', el('div', { class: 'stack' }, blocks), [
-      el('button', { class: 'btn ghost', type: 'button', onclick: () => navigate('search') }, 'Search'),
-    ]));
+    let teamId = Number(sessionStorage.getItem('orbit.group') || led[0].id);
+    if (!led.some((team) => team.id === teamId)) teamId = led[0].id;
+    const team = led.find((item) => item.id === teamId);
+    const members = navigator.onLine ? (await api(`/teams/${teamId}/members`)).data : [];
+    const active = members.filter((person) => person.status === 'active');
+    const code = team.invitation?.code || '';
+    root.replaceChildren(screen(team.name, el('div', { class: 'stack' }, [
+      led.length > 1 ? el('select', {
+        onchange: (event) => {
+          sessionStorage.setItem('orbit.group', event.target.value);
+          renderDashboard(root);
+        },
+      }, led.map((item) => el('option', { value: String(item.id), selected: item.id === teamId ? 'selected' : null }, item.name))) : null,
+      el('div', { class: 'stat' }, [el('span', {}, 'Members'), el('strong', {}, String(active.length))]),
+      code ? el('div', { class: 'card stack' }, [
+        el('span', { class: 'kicker' }, 'Group code'),
+        el('strong', { class: 'code' }, code),
+        el('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+          await navigator.clipboard?.writeText(code);
+          toast('Code copied.');
+        } }, 'Copy code'),
+      ]) : null,
+      el('h2', { class: 'section-title' }, 'Members'),
+      active.length ? searchList(active, (person) => memberRow(teamId, person), { placeholder: 'Search members', prompt: 'Search a name to open a member.' }) : el('p', { class: 'muted' }, 'Share the group code so people can join.'),
+    ])));
   } catch (error) {
-    root.replaceChildren(errorState(error.message, () => renderDashboard(root)));
+    presentError(root, error, () => renderDashboard(root));
   }
+}
+
+function memberRow(teamId, person) {
+  const open = Math.max(0, (person.assigned_count || 0) - (person.completed_count || 0));
+  return el('button', { class: 'card linkish', type: 'button', onclick: () => navigate('member', { id: teamId, user: person.id }) }, [
+    el('strong', {}, person.full_name),
+    el('span', { class: 'muted' }, `${person.completed_count || 0} done · ${open} open`),
+  ]);
 }
 
 function stat(label, value) {
@@ -99,30 +91,40 @@ function activityLine(item) {
 
 export async function renderTasks(root) {
   root.append(skeleton());
-  const teams = await loadTeams().catch(() => []);
-  const leader = isLeader(teams);
-  let filter = 'all';
-  const draw = async () => {
-    const query = filter === 'all' ? 'scope=mine' : `scope=mine&status=${encodeURIComponent(filter)}`;
-    let tasks = [];
-    try {
-      tasks = await loadTasks(query);
-      if (filter !== 'all') {
-        tasks = tasks.filter((task) => filter === 'awaiting' ? task.review_status === 'awaiting' : task.status === filter);
-      }
-    } catch (error) {
-      root.replaceChildren(errorState(error.message, draw));
-      return;
-    }
-    const chips = ['all', 'todo', 'in_progress', 'pending', 'blocked', 'done', 'awaiting'].map((key) =>
-      el('button', { class: `chip ${filter === key ? 'on' : ''}`, type: 'button', onclick: () => { filter = key; draw(); } }, key === 'all' ? 'All' : STATUS_LABEL[key])
-    );
-    root.replaceChildren(screen('My tasks', el('div', { class: 'stack' }, [
-      el('div', { class: 'chips' }, chips),
-      tasks.length ? el('div', { class: 'stack' }, tasks.map((task) => taskCard(task, () => navigate('task', { id: task.id })))) : emptyState('No tasks here', 'Assignments that match this filter will show up here.'),
-    ]), leader ? [el('button', { class: 'btn primary', type: 'button', onclick: () => navigate('task-new') }, 'New task')] : []));
-  };
-  await draw();
+  try {
+    const teams = await loadTeams().catch(() => []);
+    const tasks = await loadTasks(isLeader(teams) ? 'scope=team' : 'scope=mine');
+    root.replaceChildren(screen('Tasks', taskGroups(tasks)));
+  } catch (error) {
+    presentError(root, error, () => renderTasks(root));
+  }
+}
+
+function taskGroups(tasks) {
+  const done = tasks.filter((task) => task.status === 'done');
+  const pending = tasks.filter((task) => task.status !== 'done' && (task.status === 'pending' || task.review_status === 'awaiting'));
+  const open = tasks.filter((task) => task.status !== 'done' && task.status !== 'pending' && task.review_status !== 'awaiting');
+  if (!tasks.length) return emptyState('No tasks yet', 'Open a member and assign them a task.');
+  return el('div', { class: 'stack' }, [
+    taskSection('Done', done),
+    taskSection('Not done', open),
+    taskSection('Pending', pending),
+  ]);
+}
+
+function taskSection(title, tasks) {
+  return el('section', { class: 'stack' }, [
+    el('h2', { class: 'section-title' }, title),
+    tasks.length ? el('div', { class: 'stack' }, tasks.map(assignmentCard)) : el('p', { class: 'muted' }, 'None'),
+  ]);
+}
+
+function assignmentCard(task) {
+  const names = (task.assignees || []).map((person) => person.full_name).filter(Boolean);
+  return el('button', { class: 'card linkish', type: 'button', onclick: () => navigate('task', { id: task.id }) }, [
+    el('strong', {}, task.title),
+    el('span', { class: 'muted' }, names.length ? names.join(', ') : 'Unassigned'),
+  ]);
 }
 
 export async function renderTask(root) {
@@ -130,21 +132,15 @@ export async function renderTask(root) {
   root.append(skeleton(2));
   try {
     let task = null;
-    let comments = [];
-    let activity = [];
     if (navigator.onLine) {
       try {
         task = (await api(`/tasks/${id}`)).data;
-        comments = (await api(`/tasks/${id}/comments`)).data;
-        activity = (await api(`/tasks/${id}/activity`)).data;
         await db.put('tasks', { ...task, sync_state: 'synced', server_status: task.status });
-        for (const comment of comments) await db.put('comments', comment);
       } catch (error) {
         if (!(error instanceof OfflineError)) throw error;
       }
     }
     if (!task) task = await db.get('tasks', id);
-    if (!comments.length) comments = (await db.all('comments')).filter((item) => Number(item.task_id) === id && !item.deleted_at);
     if (!task) {
       root.replaceChildren(emptyState('Task unavailable', 'This task is not on this device yet.'));
       return;
@@ -152,61 +148,132 @@ export async function renderTask(root) {
     const teams = await loadTeams().catch(() => []);
     const team = teams.find((item) => item.id === task.team_id);
     const leader = team?.role === 'leader';
-    const body = textInput({ placeholder: 'Write a comment' });
-    body.maxLength = 4000;
+    const names = (task.assignees || []).map((person) => person.full_name).filter(Boolean);
+    const current = task.status === 'done' ? 'done' : (task.status === 'pending' || task.review_status === 'awaiting' ? 'pending' : 'open');
+    const drive = textInput({ type: 'url', placeholder: 'https://drive.google.com/...', value: task.work_link || '' });
+    const guide = textInput({ type: 'url', placeholder: 'https://drive.google.com/...', value: isDriveLink(task.instructions || '') ? task.instructions : '' });
     const view = el('div', { class: 'stack' }, [
-      el('button', { class: 'link back', type: 'button', onclick: () => history.back() }, 'Back'),
-      el('div', { class: 'row spread' }, [el('h1', {}, task.title), statusBadge(task)]),
-      el('p', { class: 'muted' }, `${PRIORITY_LABEL[task.priority]} priority${task.deadline ? ` · Due ${formatWhen(task.deadline)}` : ''}`),
-      task.sync_state === 'pending' ? el('p', { class: 'note' }, 'Saved on this device. It will sync when you are online.') : null,
+      el('h1', {}, task.title),
+      statusBadge(task),
+      el('p', { class: 'muted' }, names.length ? names.join(', ') : 'Unassigned'),
+      task.deadline ? el('p', { class: 'muted' }, `Due ${formatWhen(task.deadline)}`) : null,
       task.sync_state === 'conflict' ? conflictCard(task) : null,
-      task.description ? el('p', {}, task.description) : null,
-      task.instructions ? el('p', { class: 'muted' }, task.instructions) : null,
-      el('div', { class: 'chips' }, ['todo', 'in_progress', 'pending', 'blocked', 'done'].map((status) =>
-        el('button', {
-          class: `chip ${task.status === status ? 'on' : ''}`,
-          type: 'button',
-          onclick: () => updateStatus(task, status),
-        }, STATUS_LABEL[status])
-      )),
-      leader && task.review_status === 'awaiting' ? reviewBox(task) : null,
-      checklistBlock(task),
-      el('h2', { class: 'section-title' }, 'Conversation'),
-      ...comments.map((comment) => el('article', { class: 'card' }, [
-        el('div', { class: 'row spread' }, [el('strong', {}, comment.author_name), comment.comment_type === 'progress' ? badge('pending', 'Progress') : null]),
-        el('p', {}, comment.body),
-        el('span', { class: 'muted' }, `${formatWhen(comment.created_at)}${comment.edited ? ' · edited' : ''}${comment.pending ? ' · not synced' : ''}`),
-      ])),
-      el('form', { class: 'row', onsubmit: async (event) => {
-        event.preventDefault();
-        if (!body.value.trim()) return;
-        await queueComment(task, body.value.trim(), 'comment');
-        body.value = '';
-        try {
-          await syncNow();
-        } catch (error) {
-          if (error instanceof OfflineError) toast('Saved on this device.');
-          else toast(error.message);
-        }
-        renderTask(root);
-      } }, [body, el('button', { class: 'btn primary', type: 'submit' }, 'Send')]),
-      el('h2', { class: 'section-title' }, 'History'),
-      ...activity.map(activityLine),
-      leader ? el('button', { class: 'btn danger', type: 'button', onclick: async () => {
-        if (!await confirmDialog({ title: 'Delete this task?', message: 'The history stays in the database, and the task leaves the active list.', confirmLabel: 'Delete', danger: true })) return;
-        await api(`/tasks/${task.id}`, { method: 'DELETE' });
-        await db.delete('tasks', task.id);
-        navigate('tasks');
-      } }, 'Delete task') : null,
+      instructionView(task.instructions, leader, guide, task),
+      task.work_link ? el('a', { class: 'btn ghost', href: task.work_link, target: '_blank', rel: 'noopener noreferrer' }, 'Open submitted work') : (leader ? el('p', { class: 'muted' }, 'No submitted work yet.') : null),
+      leader ? null : field('Google Drive link', drive),
+      el('div', { class: 'chips' }, [
+        ['open', 'Not done', 'todo'],
+        ['pending', 'Pending', 'pending'],
+        ['done', 'Done', 'done'],
+      ].map(([key, label, status]) => el('button', {
+        class: `chip ${current === key ? 'on' : ''}`,
+        type: 'button',
+        onclick: () => {
+          if (status !== 'done' || leader) {
+            updateStatus(task, status);
+            return;
+          }
+          const link = drive.value.trim();
+          if (link && !isDriveLink(link)) {
+            toast('Paste a Google Drive link.');
+            return;
+          }
+          if (!link && !task.work_link) {
+            toast('Paste a Google Drive link to mark this done.');
+            return;
+          }
+          updateStatus(task, 'done', link || null);
+        },
+      }, label))),
+      leader && task.review_status === 'awaiting' ? el('button', { class: 'btn primary', type: 'button', onclick: async () => {
+        await api(`/tasks/${task.id}/review`, { method: 'POST', body: { decision: 'approved', feedback: '' } });
+        toast('Marked done.');
+        navigate('task', { id: task.id }, true);
+      } }, 'Accept as done') : null,
+      el('h2', { class: 'section-title' }, 'Talk'),
     ]);
+    let comments = [];
+    let members = [];
+    try {
+      comments = (await api(`/tasks/${id}/comments`)).data || [];
+      members = ((await api(`/teams/${task.team_id}/members`)).data || []).filter((person) => person.status === 'active');
+    } catch (error) {
+      if (!(error instanceof OfflineError)) toast(error.message);
+    }
+    const memberNames = members.map((person) => person.full_name);
+    const canTalk = leader || (task.assignees || []).some((person) => person.id === state.user?.id);
+    view.append(
+      comments.length ? el('div', { class: 'talk' }, comments.map((item) => bubble(item, memberNames))) : el('p', { class: 'muted' }, 'No comments yet.'),
+      canTalk
+        ? talkForm(members, 'Write a comment', async (body) => {
+          await api(`/tasks/${id}/comments`, { method: 'POST', body: { body } });
+          toast('Comment sent.');
+          await renderTask(root);
+        })
+        : el('p', { class: 'muted' }, 'The leader and the people on this task can reply.'),
+    );
     root.replaceChildren(view);
   } catch (error) {
-    root.replaceChildren(errorState(error.message, () => renderTask(root)));
+    presentError(root, error, () => renderTask(root));
   }
 }
 
-async function updateStatus(task, status) {
-  await queueStatus(task, status);
+function drivePreviewUrl(value) {
+  try {
+    const url = new URL(value);
+    const file = url.pathname.match(/\/file\/d\/([^/]+)/);
+    if (file) return `https://drive.google.com/file/d/${file[1]}/preview`;
+    const doc = url.pathname.match(/\/(document|spreadsheets|presentation)\/d\/([^/]+)/);
+    if (doc) return `https://${url.hostname}/${doc[1]}/d/${doc[2]}/preview`;
+    const id = url.searchParams.get('id');
+    if (id && url.hostname === 'drive.google.com') return `https://drive.google.com/file/d/${id}/preview`;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function instructionView(link, leader, guide, task) {
+  const preview = isDriveLink(link || '') ? drivePreviewUrl(link) : null;
+  const blocks = [el('h2', { class: 'section-title' }, 'Instructions')];
+  if (preview) {
+    blocks.push(el('iframe', { class: 'preview', src: preview, title: 'Instructions', loading: 'lazy' }));
+    blocks.push(el('a', { class: 'btn ghost', href: link, target: '_blank', rel: 'noopener noreferrer' }, 'Open instructions'));
+  }
+  if (leader) {
+    blocks.push(field('Instruction link', guide));
+    blocks.push(el('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+      const next = guide.value.trim();
+      if (next && !isDriveLink(next)) {
+        toast('Paste a Google Drive link.');
+        return;
+      }
+      try {
+        await api(`/tasks/${task.id}`, { method: 'PATCH', body: { instructions: next } });
+        toast('Instructions saved.');
+        navigate('task', { id: task.id }, true);
+      } catch (error) {
+        toast(error.message);
+      }
+    } }, 'Save instructions'));
+  } else if (!preview) {
+    return null;
+  }
+  return el('div', { class: 'stack' }, blocks);
+}
+
+function isDriveLink(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function updateStatus(task, status, note = null) {
+  if (note) task.work_link = note;
+  await queueStatus(task, status, note);
   try {
     await syncNow();
     toast('Status updated.');
@@ -357,7 +424,7 @@ export async function renderCalendar(root) {
     }
   } catch (error) {
     if (!(error instanceof OfflineError)) {
-      root.append(errorState(error.message, () => renderCalendar(root)));
+      presentError(root, error, () => renderCalendar(root), 'append');
       return;
     }
   }
@@ -430,7 +497,7 @@ export async function renderReport(root) {
         el('button', { class: 'btn primary', type: 'button', onclick: () => downloadCsv(select.value) }, 'Download CSV')
       );
     } catch (error) {
-      body.replaceChildren(errorState(error.message, draw));
+      presentError(body, error, draw);
     }
   };
   select.addEventListener('change', draw);

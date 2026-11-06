@@ -102,6 +102,17 @@ final class TeamController extends Controller
         Response::ok('Invitation accepted.', $this->app->get(TeamService::class)->join($this->user($request), (string) $request->input('code', '')));
     }
 
+    public function messages(Request $request): void
+    {
+        Response::ok('Messages loaded.', $this->app->get(TeamService::class)->messages($this->user($request), $this->intParam($request, 'id')));
+    }
+
+    public function postMessage(Request $request): void
+    {
+        $item = $this->app->get(TeamService::class)->postMessage($this->user($request), $this->intParam($request, 'id'), (string) $request->input('body', ''));
+        Response::ok('Message sent.', $item, 201);
+    }
+
     public function announcements(Request $request): void
     {
         Response::ok('Announcements loaded.', $this->app->get(TeamService::class)->announcements($this->user($request), $this->intParam($request, 'id')));

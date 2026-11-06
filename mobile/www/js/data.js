@@ -1,5 +1,6 @@
 import { api, ApiError, OfflineError } from './api.js';
 import { db } from './db.js';
+import { state } from './state.js';
 import { cacheTasks } from './sync.js';
 
 export async function loadTeams() {
@@ -40,6 +41,12 @@ async function mergePending(items) {
 
 export function isLeader(teams) {
   return teams.some((team) => team.role === 'leader' && team.membership_status !== 'pending');
+}
+
+export async function accountIsLeader(teams = []) {
+  if (teams.some((team) => team.role === 'leader')) return true;
+  if (!state.user) return false;
+  return (await db.meta(`designation.${state.user.id}`)) === 'leader';
 }
 
 export async function guard(root, fn) {

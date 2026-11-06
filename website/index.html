@@ -3,9 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ORBIT — Teams that keep their work in view</title>
+  <title>ORBIT by Unorthodox Technologies — Team tasks for Android</title>
+  <meta name="description" content="ORBIT is the Android team task app from Unorthodox Technologies. Founder Marte Flores Jr. and co-founders Justine Reyes, Melvin Ramos, and Clarenz Geronimo.">
+  <meta name="author" content="Unorthodox Technologies">
+  <meta property="og:title" content="ORBIT by Unorthodox Technologies">
+  <meta property="og:description" content="A calm Android app for team tasks, invitations, and deadlines. Built by Marte Flores Jr., Justine Reyes, Melvin Ramos, and Clarenz Geronimo.">
+  <meta property="og:type" content="website">
   <link rel="icon" href="assets/mark.svg">
   <link rel="stylesheet" href="css/site.css">
+  <script src="js/seo.js" defer></script>
 </head>
 <body>
   <header class="nav">
@@ -14,34 +20,34 @@
       <a href="about.html">About</a>
       <a href="download.html">Download</a>
       <a href="contact.html">Contact</a>
-      <a href="../mobile/www/index.html">Open app</a>
     </nav>
   </header>
   <main>
     <section class="hero">
       <div>
-        <p class="kicker">Team collaboration</p>
+        <p class="kicker">Unorthodox Technologies</p>
         <h1>Keep the work, the people, and the deadline in one orbit.</h1>
-        <p class="lede">ORBIT is for student groups, studios, and small teams. A leader invites members with a code, assigns the work, and watches progress. Members update their own tasks, even when the connection drops.</p>
+        <p class="lede">ORBIT is the Android app for student groups, studios, and small teams. A leader invites members with a code, assigns the work, and follows progress. Members update their own tasks, including when the connection drops.</p>
         <div class="actions">
-          <a class="btn solid" href="download.html">Get the Android app</a>
-          <a class="btn" href="../mobile/www/index.html">Use it in the browser</a>
+          <a class="btn" href="download.html">Get the Android app</a>
         </div>
       </div>
-      <div class="preview" aria-hidden="true">
-        <div class="row"><span>Studio critique</span><span class="pill">3 due today</span></div>
-        <h2 style="font-family:Georgia,serif;font-weight:500;font-size:32px;margin:18px 0 8px">Draft the research brief</h2>
-        <p style="color:#b7b3c7">Assigned to two members. Waiting on the source list.</p>
-        <div class="row" style="margin-top:28px"><span>In progress</span><span>High</span></div>
+      <div class="stage" aria-hidden="true">
+        <div class="orbit"></div>
+        <article class="float-card">
+          <span class="pill">Due today</span>
+          <strong>Draft the research brief</strong>
+          <p>Two members. Waiting on the source list.</p>
+        </article>
       </div>
     </section>
-    <section class="grid" id="features">
+    <section class="grid">
       <article class="card"><h3>Invitation codes</h3><p>Each team has an unpredictable code. Leaders can expire it, cap uses, or require approval.</p></article>
       <article class="card"><h3>Shared tasks</h3><p>Assign one task to several people, with priority, a checklist, and a deadline.</p></article>
-      <article class="card"><h3>Review when it matters</h3><p>Turn on verification and a completed task waits for the leader before it is done.</p></article>
-      <article class="card"><h3>Offline, then sync</h3><p>Status updates queue on the device. Newer server changes are not overwritten by older ones.</p></article>
+      <article class="card"><h3>Review when it matters</h3><p>Turn on verification and a completed task waits for the leader before it counts as done.</p></article>
+      <article class="card"><h3>Offline, then sync</h3><p>Status updates stay on the phone. A newer change on the server is kept when both sides edited the status.</p></article>
     </section>
-    <section style="padding:56px 0">
+    <section>
       <p class="kicker">How it works</p>
       <div class="steps">
         <article><span class="num">01</span><div><h3>Create a team</h3><p>The creator becomes the leader and receives an invitation code.</p></div></article>
@@ -51,17 +57,17 @@
     </section>
     <section class="split">
       <article class="card"><h3>For leaders</h3><p>Membership, announcements, verification, reports, and a CSV export of the team’s workload.</p></article>
-      <article class="card"><h3>For members</h3><p>A single account can sit on many teams. You only change tasks assigned to you.</p></article>
+      <article class="card"><h3>For members</h3><p>One account can sit on many teams. You change the tasks assigned to you.</p></article>
     </section>
-    <section style="padding:56px 0 12px" class="faq">
+    <section class="faq">
       <p class="kicker">Questions</p>
-      <details open><summary>Does a member see another team’s tasks?</summary><p>No. Team access is checked on the server for every request.</p></details>
+      <details open><summary>Does a member see another team’s tasks?</summary><p>Team access is checked on the server for every request.</p></details>
       <details><summary>What happens without a network?</summary><p>Previously synced teams and tasks stay available. Status changes and comments wait in a queue and sync when the connection returns.</p></details>
-      <details><summary>Where do notifications go?</summary><p>Inside the app, and to Android through Firebase Cloud Messaging once the server has a service account.</p></details>
+      <details><summary>Where do I get the app?</summary><p>From the download page, once an Android APK has been published. There is no browser edition of the app.</p></details>
     </section>
   </main>
   <footer>
-    <span>ORBIT</span>
+    <span>ORBIT · Unorthodox Technologies</span>
     <span><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="contact.html">Contact</a></span>
   </footer>
 </body>

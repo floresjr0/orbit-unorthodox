@@ -90,6 +90,7 @@ final class Present
             'title' => $row['title'],
             'description' => $row['description'],
             'instructions' => $row['instructions'],
+            'work_link' => $row['work_link'] ?? null,
             'priority' => $row['priority'],
             'status' => $row['status'],
             'review_status' => $row['review_status'],
@@ -133,6 +134,18 @@ final class Present
             'created_at' => iso($row['created_at'] ?? null),
             'updated_at' => iso($row['updated_at'] ?? null),
             'edited' => $row['edited_at'] !== null,
+        ];
+    }
+
+    public static function message(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'team_id' => (int) $row['team_id'],
+            'user_id' => $row['user_id'] !== null ? (int) $row['user_id'] : null,
+            'author_name' => $row['author_name'],
+            'body' => $row['body'],
+            'created_at' => iso($row['created_at'] ?? null),
         ];
     }
 
