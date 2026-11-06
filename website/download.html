@@ -21,7 +21,10 @@
   </main>
   <script>
     const slot = document.getElementById('release');
-    fetch('/api/v1/releases/latest').then((response) => response.json()).then((body) => {
+    const root = location.pathname.includes('/website/')
+      ? location.pathname.slice(0, location.pathname.indexOf('/website/'))
+      : '';
+    fetch(root + '/api/v1/releases/latest').then((response) => response.json()).then((body) => {
       const release = body.data;
       slot.replaceChildren();
       if (!release || !release.available) {
@@ -32,7 +35,7 @@
       text.textContent = 'Version ' + release.version + '. ' + release.changelog;
       const link = document.createElement('a');
       link.className = 'btn';
-      link.href = '/api/v1/releases/' + release.id + '/download';
+      link.href = root + '/api/v1/releases/' + release.id + '/download';
       link.textContent = 'Get the Android app';
       slot.append(text, link);
     }).catch(() => {

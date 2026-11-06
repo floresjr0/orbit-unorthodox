@@ -171,13 +171,17 @@ final class AdminService
 
     public function latestRelease(): ?array
     {
-        $stmt = $this->app->pdo()->query('SELECT * FROM app_releases WHERE is_published = 1 ORDER BY id DESC LIMIT 1');
-        $row = $stmt->fetch();
-        if (!$row || !is_file(storage_path('releases/' . $row['file_path']))) {
-            return null;
+        try {
+            $stmt = $this->app->pdo()->query('SELECT * FROM app_releases WHERE is_published = 1 ORDER BY id DESC LIMIT 1');
+            $row = $stmt->fetch();
+            if ($row && is_file(storage_path('releases/' . $row['file_path']))) {
+                return $this->release($row);
+            }
+        } catch (\Throwable) {
+            // A fresh host database may not have release rows yet. The shipped APK still downloads.
         }
 
-        return $this->release($row);
+        return $this->bundledRelease();
     }
 
     public function createRelease(array $actor, array $input, array $files): array
@@ -220,6 +224,9 @@ final class AdminService
 
     public function releaseFile(int $id): array
     {
+        if ($id === 0 && is_file($this->bundledApk())) {
+            return ['path' => $this->bundledApk(), 'name' => 'ORBIT-1.0.0.apk'];
+        }
         $stmt = $this->app->pdo()->prepare('SELECT * FROM app_releases WHERE id = ? AND is_published = 1');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
@@ -237,6 +244,30 @@ final class AdminService
         $this->app->pdo()->prepare(
             'INSERT INTO contact_messages (name, email, message, ip, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP())'
         )->execute([$name, $email, $message, $ip]);
+    }
+
+    private function bundledApk(): string
+    {
+        return storage_path('releases/ORBIT.apk');
+    }
+
+    private function bundledRelease(): ?array
+    {
+        $path = $this->bundledApk();
+        if (!is_file($path)) {
+            return null;
+        }
+
+        return [
+            'id' => 0,
+            'version' => '1.0.0',
+            'changelog' => 'Group tasks, chat, mentions, and phone alerts.',
+            'file_size' => (int) filesize($path),
+            'download_count' => 0,
+            'is_published' => true,
+            'available' => true,
+            'created_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        ];
     }
 
     private function release(array $row): array

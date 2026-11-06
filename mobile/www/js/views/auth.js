@@ -1,4 +1,5 @@
 import { api, ApiError, OfflineError } from '../api.js';
+import { registerPush } from '../push.js';
 import { db } from '../db.js';
 import { apiBase, setApiBase } from '../config.js';
 import { navigate } from '../router.js';
@@ -9,6 +10,7 @@ import { el, field, setBusy, textInput, toast } from '../ui.js';
 async function afterAuth(data, next = 'dashboard') {
   await saveSession(data);
   applyTheme(data.user.theme);
+  registerPush().catch(() => {});
   navigate(next, {}, true);
 }
 
@@ -26,6 +28,10 @@ export function renderLogin(root) {
   const button = el('button', { class: 'btn primary full', type: 'submit' }, 'Sign in');
   const form = el('form', { class: 'stack', onsubmit: async (event) => {
     event.preventDefault();
+    if (window.Capacitor?.isNativePlatform?.() && !server.value.trim()) {
+      toast('Enter the server address, such as https://your-domain/api/v1.');
+      return;
+    }
     setApiBase(server.value);
     setBusy(button, true);
     try {
@@ -38,7 +44,9 @@ export function renderLogin(root) {
   } }, [
     field('Email', email),
     field('Password', password),
-    el('details', { class: 'advanced' }, [el('summary', {}, 'Server address'), field('API base URL', server)]),
+    window.Capacitor?.isNativePlatform?.()
+      ? field('Server address', server)
+      : el('details', { class: 'advanced' }, [el('summary', {}, 'Server address'), field('API base URL', server)]),
     button,
     el('p', { class: 'auth-links' }, [
       el('button', { class: 'link', type: 'button', onclick: () => navigate('forgot') }, 'Forgot password'),
@@ -61,6 +69,7 @@ export function renderRegister(root) {
     leader.classList.toggle('on', value === 'leader');
     member.classList.toggle('on', value === 'member');
   }
+  const server = textInput({ type: 'url', value: apiBase(), placeholder: 'https://your-domain/api/v1' });
   const button = el('button', { class: 'btn primary full', type: 'submit' }, 'Create account');
   const form = el('form', { class: 'stack', onsubmit: async (event) => {
     event.preventDefault();
@@ -68,6 +77,11 @@ export function renderRegister(root) {
       toast('Choose Leader or Member.');
       return;
     }
+    if (window.Capacitor?.isNativePlatform?.() && !server.value.trim()) {
+      toast('Enter the server address, such as https://your-domain/api/v1.');
+      return;
+    }
+    setApiBase(server.value);
     setBusy(button, true);
     try {
       const result = await api('/auth/register', {
@@ -82,6 +96,7 @@ export function renderRegister(root) {
       setBusy(button, false, 'Create account');
     }
   } }, [
+    window.Capacitor?.isNativePlatform?.() ? field('Server address', server) : null,
     field('Full name', name),
     field('Email', email),
     field('Password', password),

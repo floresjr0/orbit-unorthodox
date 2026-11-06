@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { loadSession } from './session.js';
 import { applyTheme, state } from './state.js';
 import { navigate, onRender, readHash, register, show } from './router.js';
+import { registerPush } from './push.js';
 import { pendingCount, syncNow } from './sync.js';
 import { icon, mark } from './ui.js';
 import { renderForgot, renderLogin, renderRegister } from './views/auth.js';
@@ -165,5 +166,6 @@ if (!state.user && !['login', 'register', 'forgot'].includes(initial.name)) {
   await show();
 }
 if (state.user && navigator.onLine) {
+  registerPush().catch(() => {});
   syncNow().then(() => show()).catch(() => { state.offline = true; paintChrome(); });
 }

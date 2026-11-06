@@ -13,9 +13,19 @@ final class FcmService
     public function configured(): bool
     {
         $fcm = $this->app->config['fcm'] ?? [];
-        $path = (string) ($fcm['service_account'] ?? '');
 
-        return ($fcm['project_id'] ?? '') !== '' && $path !== '' && is_file($path);
+        return ($fcm['project_id'] ?? '') !== '' && is_file($this->accountPath());
+    }
+
+    private function accountPath(): string
+    {
+        $path = (string) ($this->app->config['fcm']['service_account'] ?? '');
+        if ($path === '') {
+            return '';
+        }
+        $absolute = preg_match('/^(?:[A-Za-z]:[\\\\\\/]|\/|\\\\)/', $path) === 1;
+
+        return $absolute ? $path : storage_path($path);
     }
 
     public function send(array $tokens, string $title, string $body, array $data): void
@@ -96,7 +106,7 @@ final class FcmService
             }
         }
 
-        $sa = json_decode((string) file_get_contents((string) $this->app->config['fcm']['service_account']), true);
+        $sa = json_decode((string) file_get_contents($this->accountPath()), true);
         if (!is_array($sa) || empty($sa['client_email']) || empty($sa['private_key'])) {
             throw new \RuntimeException('The Firebase service account file is incomplete.');
         }

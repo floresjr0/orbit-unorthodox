@@ -2,5 +2,8 @@ RewriteEngine On
 RewriteRule ^backend(/|$) - [F,L]
 RewriteRule ^database(/|$) - [F,L]
 RewriteRule ^documentation(/|$) - [F,L]
+RewriteRule ^mobile/android(/|$) - [F,L]
+RewriteRule ^mobile/node_modules(/|$) - [F,L]
+RewriteRule \.(?:jks|keystore)$ - [F,L]
 
 DirectoryIndex index.php index.html

@@ -2,7 +2,7 @@ export function apiBase() {
   const saved = localStorage.getItem('orbit.apiBase');
   if (saved) return saved.replace(/\/$/, '');
   const native = window.Capacitor?.isNativePlatform?.();
-  if (native) return 'http://10.0.2.2/orbit-unorthodox/api/v1';
+  if (native) return '';
   const root = location.pathname.includes('/orbit-unorthodox') ? '/orbit-unorthodox' : '';
   return `${location.origin}${root}/api/v1`;
 }
